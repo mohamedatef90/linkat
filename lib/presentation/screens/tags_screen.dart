@@ -94,14 +94,20 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
   @override
   Widget build(BuildContext context) {
     final tagsAsync = ref.watch(allTagsProvider);
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final textColor = isDark ? NotionTheme.darkTextPrimary : NotionTheme.primaryBlack;
+    final subtextColor = isDark ? NotionTheme.darkTextSecondary : NotionTheme.textGray;
+    final backgroundColor = isDark ? NotionTheme.darkSurface : NotionTheme.backgroundOffWhite;
+    final borderColor = isDark ? NotionTheme.darkDivider : NotionTheme.dividerColor;
 
     return Scaffold(
       appBar: AppBar(
         title: Row(
-          children: const [
-            Icon(Icons.tag, size: 20),
-            SizedBox(width: 8),
-            Text('Tags'),
+          children: [
+            Icon(Icons.tag, size: 20, color: textColor),
+            const SizedBox(width: 8),
+            Text('Tags', style: TextStyle(color: textColor)),
           ],
         ),
       ),
@@ -115,20 +121,20 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
                   Icon(
                     Icons.tag,
                     size: 48,
-                    color: NotionTheme.textGray.withOpacity(0.5),
+                    color: subtextColor.withOpacity(0.5),
                   ),
                   const SizedBox(height: 16),
                   Text(
                     'No tags yet',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: NotionTheme.textGray,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: subtextColor,
                     ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     'Tags will appear when you save links',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: NotionTheme.textGray,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: subtextColor,
                     ),
                   ),
                 ],
@@ -151,19 +157,19 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
                         vertical: 12,
                       ),
                       decoration: BoxDecoration(
-                        color: NotionTheme.backgroundOffWhite,
+                        color: backgroundColor,
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
                           color: _isDropdownOpen
-                              ? NotionTheme.primaryBlack
-                              : NotionTheme.dividerColor,
+                              ? theme.primaryColor
+                              : borderColor,
                         ),
                       ),
                       child: Row(
                         children: [
-                          const Icon(
+                          Icon(
                             Icons.tag,
-                            color: NotionTheme.textGray,
+                            color: subtextColor,
                             size: 20,
                           ),
                           const SizedBox(width: 12),
@@ -177,7 +183,7 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
                                           vertical: 4,
                                         ),
                                         decoration: BoxDecoration(
-                                          color: NotionTheme.primaryBlack,
+                                          color: theme.primaryColor,
                                           borderRadius: BorderRadius.circular(16),
                                         ),
                                         child: Text(
@@ -196,10 +202,10 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
                                             _selectedTag = null;
                                           });
                                         },
-                                        child: const Icon(
+                                        child: Icon(
                                           Icons.close,
                                           size: 18,
-                                          color: NotionTheme.textGray,
+                                          color: subtextColor,
                                         ),
                                       ),
                                     ],
@@ -207,7 +213,7 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
                                 : Text(
                                     'Select a tag (${tags.length} available)',
                                     style: TextStyle(
-                                      color: NotionTheme.textGray.withOpacity(0.7),
+                                      color: subtextColor.withOpacity(0.7),
                                       fontSize: 15,
                                     ),
                                   ),
@@ -217,7 +223,7 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
                             _isDropdownOpen
                                 ? Icons.keyboard_arrow_up
                                 : Icons.keyboard_arrow_down,
-                            color: NotionTheme.textGray,
+                            color: subtextColor,
                           ),
                         ],
                       ),
@@ -226,7 +232,7 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
                 ),
               ),
 
-              const Divider(color: NotionTheme.dividerColor, height: 1),
+              Divider(color: borderColor, height: 1),
 
               // Links with selected tag
               if (_selectedTag != null)
@@ -242,20 +248,20 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
                         Icon(
                           Icons.touch_app_outlined,
                           size: 48,
-                          color: NotionTheme.textGray.withOpacity(0.5),
+                          color: subtextColor.withOpacity(0.5),
                         ),
                         const SizedBox(height: 16),
                         Text(
                           'Select a tag to see links',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: NotionTheme.textGray,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: subtextColor,
                           ),
                         ),
                         const SizedBox(height: 8),
                         Text(
                           'Tap the dropdown above to choose a tag',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: NotionTheme.textGray,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: subtextColor,
                           ),
                         ),
                       ],
@@ -265,15 +271,15 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
             ],
           );
         },
-        loading: () => const Center(
+        loading: () => Center(
           child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(NotionTheme.primaryBlack),
+            valueColor: AlwaysStoppedAnimation<Color>(theme.primaryColor),
           ),
         ),
         error: (err, stack) => Center(
           child: Text(
             'Error loading tags',
-            style: Theme.of(context).textTheme.bodyMedium,
+            style: theme.textTheme.bodyMedium?.copyWith(color: textColor),
           ),
         ),
       ),

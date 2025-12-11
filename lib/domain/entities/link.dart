@@ -1,5 +1,6 @@
 import 'platform_type.dart';
 import 'topic_type.dart';
+import 'content_type.dart';
 
 class Link {
   final int? id;
@@ -11,8 +12,10 @@ class Link {
   final String? aiDescription;
   final PlatformType platform;
   final TopicType topic;
+  final ContentType contentType;
   final List<String> tags;
   final DateTime createdAt;
+  final int? customCategoryId;
 
   Link({
     this.id,
@@ -24,8 +27,10 @@ class Link {
     this.aiDescription,
     required this.platform,
     this.topic = TopicType.other,
+    this.contentType = ContentType.other,
     this.tags = const [],
     required this.createdAt,
+    this.customCategoryId,
   });
 
   Link copyWith({
@@ -38,8 +43,10 @@ class Link {
     String? aiDescription,
     PlatformType? platform,
     TopicType? topic,
+    ContentType? contentType,
     List<String>? tags,
     DateTime? createdAt,
+    int? customCategoryId,
   }) {
     return Link(
       id: id ?? this.id,
@@ -51,8 +58,10 @@ class Link {
       aiDescription: aiDescription ?? this.aiDescription,
       platform: platform ?? this.platform,
       topic: topic ?? this.topic,
+      contentType: contentType ?? this.contentType,
       tags: tags ?? this.tags,
       createdAt: createdAt ?? this.createdAt,
+      customCategoryId: customCategoryId ?? this.customCategoryId,
     );
   }
 }

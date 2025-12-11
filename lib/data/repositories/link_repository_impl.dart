@@ -3,8 +3,10 @@ import 'package:path_provider/path_provider.dart';
 import '../../domain/entities/link.dart';
 import '../../domain/entities/platform_type.dart';
 import '../../domain/entities/topic_type.dart';
+import '../../domain/entities/custom_category.dart';
 import '../../domain/repositories/i_link_repository.dart';
 import '../models/link_model.dart';
+import '../models/custom_category_model.dart';
 
 class LinkRepositoryImpl implements ILinkRepository {
   late Future<Isar> db;
@@ -16,7 +18,10 @@ class LinkRepositoryImpl implements ILinkRepository {
   Future<Isar> _initDb() async {
     if (Isar.instanceNames.isEmpty) {
       final dir = await getApplicationDocumentsDirectory();
-      return await Isar.open([LinkModelSchema], directory: dir.path);
+      return await Isar.open(
+        [LinkModelSchema, CustomCategoryModelSchema],
+        directory: dir.path,
+      );
     }
     return Future.value(Isar.getInstance());
   }
@@ -135,5 +140,60 @@ class LinkRepositoryImpl implements ILinkRepository {
         .urlEqualTo(url, caseSensitive: false)
         .findFirst();
     return link?.toEntity();
+  }
+
+  // Custom Category methods
+  @override
+  Future<List<CustomCategory>> getCustomCategories() async {
+    final isar = await db;
+    final categories = await isar.customCategoryModels
+        .where()
+        .sortByCreatedAtDesc()
+        .findAll();
+    return categories.map((e) => e.toEntity()).toList();
+  }
+
+  @override
+  Future<CustomCategory?> getCustomCategory(int id) async {
+    final isar = await db;
+    final category = await isar.customCategoryModels.get(id);
+    return category?.toEntity();
+  }
+
+  @override
+  Future<void> saveCustomCategory(CustomCategory category) async {
+    final isar = await db;
+    final model = CustomCategoryModel.fromEntity(category);
+    await isar.writeTxn(() async {
+      await isar.customCategoryModels.put(model);
+    });
+  }
+
+  @override
+  Future<void> updateCustomCategory(CustomCategory category) async {
+    final isar = await db;
+    final model = CustomCategoryModel.fromEntity(category);
+    await isar.writeTxn(() async {
+      await isar.customCategoryModels.put(model);
+    });
+  }
+
+  @override
+  Future<void> deleteCustomCategory(int id) async {
+    final isar = await db;
+    await isar.writeTxn(() async {
+      await isar.customCategoryModels.delete(id);
+    });
+  }
+
+  @override
+  Future<List<Link>> getLinksByCustomCategory(int categoryId) async {
+    final isar = await db;
+    final links = await isar.linkModels
+        .filter()
+        .customCategoryIdEqualTo(categoryId)
+        .sortByCreatedAtDesc()
+        .findAll();
+    return links.map((e) => e.toEntity()).toList();
   }
 }

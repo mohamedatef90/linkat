@@ -7,7 +7,7 @@ class AiDescriptionService {
   AiDescriptionService() {
     final apiKey = dotenv.env['GEMINI_API_KEY'];
     if (apiKey != null && apiKey.isNotEmpty) {
-      _model = GenerativeModel(model: 'gemini-2.5-flash', apiKey: apiKey);
+      _model = GenerativeModel(model: 'gemini-1.5-flash', apiKey: apiKey);
     }
   }
 

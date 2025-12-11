@@ -5,12 +5,16 @@ import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../../domain/entities/platform_type.dart';
 import '../../domain/entities/link.dart';
+import '../../domain/entities/custom_category.dart';
 import '../../services/pending_links_service.dart';
 import '../providers/link_providers.dart';
 import '../theme/notion_theme.dart';
+import '../providers/theme_provider.dart';
 import 'tags_screen.dart';
 import 'topics_screen.dart';
 import 'link_detail_screen.dart';
+import 'manage_categories_screen.dart';
+import 'category_detail_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -19,7 +23,8 @@ class HomeScreen extends ConsumerStatefulWidget {
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObserver {
+class _HomeScreenState extends ConsumerState<HomeScreen>
+    with WidgetsBindingObserver {
   final TextEditingController _searchController = TextEditingController();
   bool _isSearching = false;
   List<Link>? _searchResults;
@@ -124,30 +129,32 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
 
       final platform = platformService.detectPlatform(pending.url);
 
-      // Try to fetch additional metadata
+      // Fetch metadata from the URL
       Map<String, String?> metadata = {
-        'title': pending.title,
+        'title': null,
         'description': null,
         'image': null,
         'publisher': null,
       };
 
       try {
-        final fetchedMetadata = await metadataService.fetchMetadata(pending.url);
-        // Only override title if fetched one is better
-        if (fetchedMetadata['title'] != null &&
-            fetchedMetadata['title']!.isNotEmpty &&
-            !pending.title.startsWith('Link from ')) {
-          metadata = fetchedMetadata;
-          metadata['title'] = pending.title; // Keep user's title
-        } else {
-          metadata = fetchedMetadata;
-          if (metadata['title'] == null || metadata['title']!.isEmpty) {
-            metadata['title'] = pending.title;
-          }
-        }
+        final fetchedMetadata = await metadataService.fetchMetadata(
+          pending.url,
+        );
+        metadata = fetchedMetadata;
       } catch (e) {
-        // Use pending link data as fallback
+        // Use fallback on error
+      }
+
+      // Use fetched title, or pending title if available, or URL as last resort
+      if (metadata['title'] == null || metadata['title']!.isEmpty) {
+        if (pending.title.isNotEmpty) {
+          metadata['title'] = pending.title;
+        } else {
+          // Extract domain as fallback title
+          final uri = Uri.tryParse(pending.url);
+          metadata['title'] = uri?.host ?? pending.url;
+        }
       }
 
       // Classify topic
@@ -185,6 +192,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
         // Skip AI description on error
       }
 
+      // Detect content type from URL and metadata
+      final contentTypeService = ref.read(contentTypeDetectionServiceProvider);
+      final contentType = contentTypeService.detectContentType(
+        pending.url,
+        platform,
+        metadata['contentType'],
+      );
+
       final link = Link(
         url: pending.url,
         title: metadata['title'] ?? pending.title,
@@ -194,6 +209,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
         aiDescription: aiDescription,
         platform: platform,
         topic: topic,
+        contentType: contentType,
         tags: tags,
         createdAt: pending.createdAt,
       );
@@ -298,10 +314,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
       urlToSave = cleanedText;
     } else {
       // Try to find a URL within the text
-      final urlRegExp = RegExp(
-        r'https?://[^\s]+',
-        caseSensitive: false,
-      );
+      final urlRegExp = RegExp(r'https?://[^\s]+', caseSensitive: false);
       final match = urlRegExp.firstMatch(cleanedText);
       if (match != null) {
         urlToSave = match.group(0);
@@ -320,8 +333,42 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    // Use actual theme brightness instead of just the provider state
+    final isDarkMode = theme.brightness == Brightness.dark;
+    final textColor = isDarkMode ? NotionTheme.darkTextPrimary : NotionTheme.primaryBlack;
+    final subtextColor = isDarkMode ? NotionTheme.darkTextSecondary : NotionTheme.textGray;
+    final borderColor = isDarkMode
+        ? NotionTheme.darkDivider
+        : NotionTheme.dividerColor;
+    final itemBackgroundColor = isDarkMode
+        ? NotionTheme.darkSurface
+        : Colors.white;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Linkat')),
+      backgroundColor: theme.scaffoldBackgroundColor,
+      appBar: AppBar(
+        backgroundColor: theme.scaffoldBackgroundColor,
+        elevation: 0,
+        title: Text(
+          'Linkat',
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        actions: [
+          IconButton(
+            icon: Icon(
+              _getThemeIcon(ref.watch(themeModeProvider)),
+              color: textColor,
+            ),
+            onPressed: () {
+              ref.read(themeModeProvider.notifier).toggleTheme();
+            },
+            tooltip: _getThemeTooltip(ref.watch(themeModeProvider)),
+          ),
+        ],
+      ),
       body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
@@ -331,50 +378,56 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
               // Title Section
               Row(
                 children: [
-                  const Icon(Icons.dashboard_outlined, size: 28),
+                  Icon(Icons.dashboard_outlined, size: 28, color: textColor),
                   const SizedBox(width: 12),
-                  Text(
-                    'Dashboard',
-                    style: Theme.of(context).textTheme.displayMedium,
-                  ),
+                  Text('Dashboard', style: theme.textTheme.displayMedium),
                 ],
               ),
               const SizedBox(height: 24),
 
-              // AI Search Bar
+              // Search Bar
               Container(
                 decoration: BoxDecoration(
-                  color: NotionTheme.backgroundOffWhite,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: NotionTheme.dividerColor),
+                  color: itemBackgroundColor,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: borderColor),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
                 child: TextField(
                   controller: _searchController,
+                  style: TextStyle(color: textColor),
                   decoration: InputDecoration(
-                    hintText: 'AI Search: try "AI articles" or "design tools"',
+                    hintText: 'Search your links...',
                     hintStyle: TextStyle(
-                      color: NotionTheme.textGray.withAlpha(128),
+                      color: subtextColor.withOpacity(0.6),
                       fontSize: 14,
                     ),
                     prefixIcon: _isSearchLoading
-                        ? const Padding(
-                            padding: EdgeInsets.all(12),
+                        ? Padding(
+                            padding: const EdgeInsets.all(12),
                             child: SizedBox(
                               width: 20,
                               height: 20,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                color: Color(0xFF9333EA),
+                                color: theme.primaryColor,
                               ),
                             ),
                           )
-                        : const Icon(
-                            Icons.auto_awesome,
-                            color: Color(0xFF9333EA),
-                          ),
+                        : Icon(Icons.search, color: subtextColor),
                     suffixIcon: _isSearching
                         ? IconButton(
-                            icon: const Icon(Icons.close, size: 20),
+                            icon: Icon(
+                              Icons.close,
+                              size: 20,
+                              color: subtextColor,
+                            ),
                             onPressed: _clearSearch,
                           )
                         : null,
@@ -396,23 +449,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFAF5FF),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: const Color(0xFFE9D5FF)),
+                      color: theme.colorScheme.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: theme.colorScheme.primary.withOpacity(0.2),
+                      ),
                     ),
                     child: Row(
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.auto_awesome,
                           size: 16,
-                          color: Color(0xFF9333EA),
+                          color: theme.colorScheme.primary,
                         ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             _searchExplanation!,
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: const Color(0xFF9333EA),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.primary,
                             ),
                           ),
                         ),
@@ -429,13 +484,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                           Icon(
                             Icons.search_off,
                             size: 48,
-                            color: NotionTheme.textGray.withAlpha(128),
+                            color: subtextColor.withOpacity(0.5),
                           ),
                           const SizedBox(height: 12),
                           Text(
                             'No results found',
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: NotionTheme.textGray,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: subtextColor,
                             ),
                           ),
                         ],
@@ -450,128 +505,336 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                     separatorBuilder: (_, __) => const SizedBox(height: 8),
                     itemBuilder: (context, index) {
                       final link = _searchResults![index];
-                      return _SearchResultCard(link: link);
+                      return _SearchResultCard(
+                        link: link,
+                        isDarkMode: isDarkMode,
+                      );
                     },
                   ),
                 const SizedBox(height: 16),
-                const Divider(color: NotionTheme.dividerColor),
+                Divider(color: borderColor),
               ],
 
               const SizedBox(height: 24),
 
-              Text('PLATFORMS', style: Theme.of(context).textTheme.labelSmall),
-              const SizedBox(height: 8),
+              Text(
+                'PLATFORMS',
+                style: theme.textTheme.labelSmall?.copyWith(letterSpacing: 1.2),
+              ),
+              const SizedBox(height: 12),
 
               // Platform List
-              ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: PlatformType.values.length,
-                separatorBuilder: (context, index) => const Divider(
-                  height: 1,
-                  thickness: 1,
-                  color: NotionTheme.dividerColor,
+              Container(
+                decoration: BoxDecoration(
+                  color: itemBackgroundColor,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: borderColor),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
-                itemBuilder: (context, index) {
-                  final platform = PlatformType.values[index];
-                  return _PlatformRow(platform: platform);
-                },
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: PlatformType.values.length,
+                  separatorBuilder: (context, index) =>
+                      Divider(height: 1, color: borderColor),
+                  itemBuilder: (context, index) {
+                    final platform = PlatformType.values[index];
+                    return _PlatformRow(
+                      platform: platform,
+                      textColor: textColor,
+                      subtextColor: subtextColor,
+                    );
+                  },
+                ),
               ),
 
               const SizedBox(height: 32),
 
-              Text('BROWSE', style: Theme.of(context).textTheme.labelSmall),
-              const SizedBox(height: 8),
+              Text(
+                'BROWSE',
+                style: theme.textTheme.labelSmall?.copyWith(letterSpacing: 1.2),
+              ),
+              const SizedBox(height: 12),
 
-              // Tags Row
-              InkWell(
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => const TagsScreen(),
+              // Browse Section
+              Container(
+                decoration: BoxDecoration(
+                  color: itemBackgroundColor,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: borderColor),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 2),
                     ),
-                  );
-                },
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.tag, size: 20, color: NotionTheme.textGray),
-                      const SizedBox(width: 12),
-                      Text(
-                        'Browse by Tags',
-                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          decoration: TextDecoration.underline,
-                          decorationColor: NotionTheme.dividerColor,
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    // Tags Row
+                    InkWell(
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => const TagsScreen(),
+                          ),
+                        );
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 14,
+                          horizontal: 16,
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.tag, size: 20, color: subtextColor),
+                            const SizedBox(width: 12),
+                            Text(
+                              'Browse by Tags',
+                              style: theme.textTheme.bodyLarge?.copyWith(
+                                color: textColor,
+                              ),
+                            ),
+                            const Spacer(),
+                            Icon(
+                              Icons.chevron_right,
+                              size: 20,
+                              color: subtextColor,
+                            ),
+                          ],
                         ),
                       ),
-                      const Spacer(),
-                      const Icon(
-                        Icons.chevron_right,
-                        size: 20,
-                        color: NotionTheme.textGray,
+                    ),
+
+                    Divider(height: 1, color: borderColor),
+
+                    // Topics Row
+                    InkWell(
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => const TopicsScreen(),
+                          ),
+                        );
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 14,
+                          horizontal: 16,
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.category, size: 20, color: subtextColor),
+                            const SizedBox(width: 12),
+                            Text(
+                              'Browse by Topics',
+                              style: theme.textTheme.bodyLarge?.copyWith(
+                                color: textColor,
+                              ),
+                            ),
+                            const Spacer(),
+                            Icon(
+                              Icons.chevron_right,
+                              size: 20,
+                              color: subtextColor,
+                            ),
+                          ],
+                        ),
                       ),
-                    ],
-                  ),
+                    ),
+
+                    Divider(height: 1, color: borderColor),
+
+                    // Manage Categories Row
+                    InkWell(
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) =>
+                                const ManageCategoriesScreen(),
+                          ),
+                        );
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 14,
+                          horizontal: 16,
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.settings_outlined,
+                              size: 20,
+                              color: subtextColor,
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              'Manage Categories',
+                              style: theme.textTheme.bodyLarge?.copyWith(
+                                color: textColor,
+                              ),
+                            ),
+                            const Spacer(),
+                            Icon(
+                              Icons.chevron_right,
+                              size: 20,
+                              color: subtextColor,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
 
-              const Divider(height: 1, color: NotionTheme.dividerColor),
-
-              // Topics Row
-              InkWell(
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => const TopicsScreen(),
-                    ),
-                  );
-                },
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.category, size: 20, color: NotionTheme.textGray),
-                      const SizedBox(width: 12),
-                      Text(
-                        'Browse by Topics',
-                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          decoration: TextDecoration.underline,
-                          decorationColor: NotionTheme.dividerColor,
-                        ),
-                      ),
-                      const Spacer(),
-                      const Icon(
-                        Icons.chevron_right,
-                        size: 20,
-                        color: NotionTheme.textGray,
-                      ),
-                    ],
-                  ),
-                ),
+              // Custom Categories Section
+              _buildCustomCategoriesSection(
+                theme,
+                textColor,
+                subtextColor,
+                itemBackgroundColor,
+                borderColor,
               ),
-
-              const SizedBox(height: 32),
             ],
           ),
         ),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => context.push('/add'),
-        backgroundColor: NotionTheme.primaryBlack,
-        foregroundColor: Colors.white,
-        elevation: 2,
-        shape: const CircleBorder(),
+        backgroundColor: theme.floatingActionButtonTheme.backgroundColor,
+        foregroundColor: theme.colorScheme.onPrimary,
         child: const Icon(Icons.add),
       ),
     );
+  }
+
+  Widget _buildCustomCategoriesSection(
+    ThemeData theme,
+    Color textColor,
+    Color subtextColor,
+    Color itemBackgroundColor,
+    Color borderColor,
+  ) {
+    return Consumer(
+      builder: (context, ref, _) {
+        final categoriesAsync = ref.watch(customCategoriesProvider);
+
+        return categoriesAsync.when(
+          data: (categories) {
+            if (categories.isEmpty) {
+              return const SizedBox.shrink();
+            }
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 32),
+                Row(
+                  children: [
+                    Text(
+                      'MY CATEGORIES',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        letterSpacing: 1.2,
+                        color: subtextColor,
+                      ),
+                    ),
+                    const Spacer(),
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => const ManageCategoriesScreen(),
+                          ),
+                        );
+                      },
+                      child: Text(
+                        'Manage',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  decoration: BoxDecoration(
+                    color: itemBackgroundColor,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: borderColor),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      for (int i = 0; i < categories.length; i++) ...[
+                        if (i > 0) Divider(height: 1, color: borderColor),
+                        _CategoryRow(
+                          category: categories[i],
+                          textColor: textColor,
+                          subtextColor: subtextColor,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            );
+          },
+          loading: () => const SizedBox.shrink(),
+          error: (_, __) => const SizedBox.shrink(),
+        );
+      },
+    );
+  }
+
+  IconData _getThemeIcon(ThemeMode mode) {
+    switch (mode) {
+      case ThemeMode.light:
+        return Icons.light_mode;
+      case ThemeMode.dark:
+        return Icons.dark_mode;
+      case ThemeMode.system:
+        return Icons.brightness_auto;
+    }
+  }
+
+  String _getThemeTooltip(ThemeMode mode) {
+    switch (mode) {
+      case ThemeMode.light:
+        return 'Light mode (tap for dark)';
+      case ThemeMode.dark:
+        return 'Dark mode (tap for auto)';
+      case ThemeMode.system:
+        return 'Auto mode (tap for light)';
+    }
   }
 }
 
 class _PlatformRow extends ConsumerWidget {
   final PlatformType platform;
+  final Color textColor;
+  final Color subtextColor;
 
-  const _PlatformRow({required this.platform});
+  const _PlatformRow({
+    required this.platform,
+    required this.textColor,
+    required this.subtextColor,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -580,7 +843,7 @@ class _PlatformRow extends ConsumerWidget {
     return InkWell(
       onTap: () => context.push('/folder/${platform.name}'),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
         child: Row(
           children: [
             FaIcon(
@@ -591,10 +854,9 @@ class _PlatformRow extends ConsumerWidget {
             const SizedBox(width: 12),
             Text(
               platform.displayName,
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                decoration: TextDecoration.underline,
-                decorationColor: NotionTheme.dividerColor,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyLarge?.copyWith(color: textColor),
             ),
             const Spacer(),
             linksAsync.when(
@@ -602,14 +864,18 @@ class _PlatformRow extends ConsumerWidget {
                 '${links.length}',
                 style: Theme.of(
                   context,
-                ).textTheme.bodyMedium?.copyWith(color: NotionTheme.textGray),
+                ).textTheme.bodySmall?.copyWith(color: subtextColor),
               ),
-              loading: () => const SizedBox(
-                width: 10,
-                height: 10,
-                child: CircularProgressIndicator(strokeWidth: 1),
+              loading: () => SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(
+                  strokeWidth: 1.5,
+                  color: subtextColor,
+                ),
               ),
-              error: (_, __) => const Icon(Icons.error_outline, size: 14),
+              error: (_, __) =>
+                  Icon(Icons.error_outline, size: 14, color: subtextColor),
             ),
           ],
         ),
@@ -652,42 +918,139 @@ class _PlatformRow extends ConsumerWidget {
   }
 }
 
-class _SearchResultCard extends StatelessWidget {
-  final Link link;
+class _CategoryRow extends ConsumerWidget {
+  final CustomCategory category;
+  final Color textColor;
+  final Color subtextColor;
 
-  const _SearchResultCard({required this.link});
+  const _CategoryRow({
+    required this.category,
+    required this.textColor,
+    required this.subtextColor,
+  });
 
   @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
+  Widget build(BuildContext context, WidgetRef ref) {
+    final linksAsync = ref.watch(linksByCustomCategoryProvider(category.id!));
+    final categoryColor = Color(category.colorValue);
+    final categoryIcon = category.iconName != null
+        ? IconData(int.parse(category.iconName!), fontFamily: 'MaterialIcons')
+        : Icons.folder_outlined;
+
+    return InkWell(
       onTap: () {
         Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (context) => LinkDetailScreen(link: link),
+            builder: (context) => CategoryDetailScreen(category: category),
           ),
+        );
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+        child: Row(
+          children: [
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: categoryColor.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                categoryIcon,
+                size: 18,
+                color: categoryColor,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                category.name,
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: textColor,
+                ),
+              ),
+            ),
+            linksAsync.when(
+              data: (links) => Text(
+                '${links.length}',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: subtextColor,
+                ),
+              ),
+              loading: () => SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(
+                  strokeWidth: 1.5,
+                  color: subtextColor,
+                ),
+              ),
+              error: (_, __) => Icon(
+                Icons.error_outline,
+                size: 14,
+                color: subtextColor,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SearchResultCard extends StatelessWidget {
+  final Link link;
+  final bool isDarkMode;
+
+  const _SearchResultCard({required this.link, required this.isDarkMode});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final borderColor = isDarkMode
+        ? NotionTheme.darkDivider
+        : NotionTheme.dividerColor;
+    final itemBackgroundColor = isDarkMode
+        ? NotionTheme.darkSurface
+        : Colors.white;
+
+    return GestureDetector(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (context) => LinkDetailScreen(link: link)),
         );
       },
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: NotionTheme.backgroundOffWhite,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: NotionTheme.dividerColor),
+          color: itemBackgroundColor,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: borderColor),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 5,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Thumbnail
             if (link.imageUrl != null)
-              Container(
-                width: 50,
-                height: 50,
-                margin: const EdgeInsets.only(right: 12),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(6),
-                  image: DecorationImage(
-                    image: NetworkImage(link.imageUrl!),
-                    fit: BoxFit.cover,
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  width: 50,
+                  height: 50,
+                  margin: const EdgeInsets.only(right: 12),
+                  decoration: BoxDecoration(
+                    image: DecorationImage(
+                      image: NetworkImage(link.imageUrl!),
+                      fit: BoxFit.cover,
+                    ),
                   ),
                 ),
               )
@@ -697,12 +1060,12 @@ class _SearchResultCard extends StatelessWidget {
                 height: 50,
                 margin: const EdgeInsets.only(right: 12),
                 decoration: BoxDecoration(
-                  color: NotionTheme.sidebarColor,
-                  borderRadius: BorderRadius.circular(6),
+                  color: isDarkMode ? Colors.white12 : Colors.grey[100],
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.link,
-                  color: NotionTheme.textGray,
+                  color: theme.textTheme.bodySmall?.color,
                   size: 20,
                 ),
               ),
@@ -716,7 +1079,7 @@ class _SearchResultCard extends StatelessWidget {
                     link.title,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    style: theme.textTheme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -725,27 +1088,26 @@ class _SearchResultCard extends StatelessWidget {
                     children: [
                       Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
+                          horizontal: 8,
+                          vertical: 3,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF9333EA).withAlpha(26),
+                          color: theme.colorScheme.primary.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
                           link.topic.displayName,
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: const Color(0xFF9333EA),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.primary,
                             fontSize: 10,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                       ),
                       const SizedBox(width: 8),
                       Text(
                         link.platform.displayName,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: NotionTheme.textGray,
-                        ),
+                        style: theme.textTheme.bodySmall,
                       ),
                     ],
                   ),
@@ -753,9 +1115,9 @@ class _SearchResultCard extends StatelessWidget {
               ),
             ),
 
-            const Icon(
+            Icon(
               Icons.chevron_right,
-              color: NotionTheme.textGray,
+              color: theme.textTheme.bodySmall?.color,
               size: 20,
             ),
           ],

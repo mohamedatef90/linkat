@@ -10,6 +10,7 @@ import '../../domain/entities/platform_type.dart';
 import '../../domain/entities/topic_type.dart';
 import '../../data/services/translation_service.dart';
 import '../providers/link_providers.dart';
+import '../providers/theme_provider.dart';
 import '../theme/notion_theme.dart';
 
 final _translationServiceProvider = Provider<TranslationService>((ref) {
@@ -268,9 +269,23 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final link = _currentLink;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    final borderColor = isDark
+        ? NotionTheme.darkDivider
+        : NotionTheme.dividerColor;
+    final textColor = isDark ? NotionTheme.darkTextPrimary : NotionTheme.primaryBlack;
+    final subtextColor = isDark ? NotionTheme.darkTextSecondary : NotionTheme.textGray;
+    final sidebarColor = isDark
+        ? NotionTheme.darkSidebar
+        : NotionTheme.sidebarColor;
 
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
+        backgroundColor: theme.scaffoldBackgroundColor,
+        elevation: 0,
         title: Row(
           children: [
             FaIcon(
@@ -279,18 +294,16 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
               color: _getPlatformColor(link.platform),
             ),
             const SizedBox(width: 8),
-            Text(link.platform.displayName),
+            Text(link.platform.displayName, style: theme.textTheme.titleMedium),
           ],
         ),
+        iconTheme: IconThemeData(color: textColor),
         actions: [
           IconButton(
-            icon: const Icon(Icons.share),
+            icon: Icon(Icons.share, color: textColor),
             onPressed: () async {
               try {
-                await Share.share(
-                  link.url,
-                  subject: link.title,
-                );
+                await Share.share(link.url, subject: link.title);
               } catch (e) {
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -315,7 +328,7 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
                 width: double.infinity,
                 height: 200,
                 decoration: BoxDecoration(
-                  color: NotionTheme.sidebarColor,
+                  color: sidebarColor,
                   image: DecorationImage(
                     image: NetworkImage(link.imageUrl!),
                     fit: BoxFit.cover,
@@ -327,13 +340,9 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
               Container(
                 width: double.infinity,
                 height: 120,
-                color: NotionTheme.sidebarColor,
-                child: const Center(
-                  child: Icon(
-                    Icons.link,
-                    size: 48,
-                    color: NotionTheme.textGray,
-                  ),
+                color: sidebarColor,
+                child: Center(
+                  child: Icon(Icons.link, size: 48, color: subtextColor),
                 ),
               ),
 
@@ -343,10 +352,7 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Title
-                  Text(
-                    link.title,
-                    style: Theme.of(context).textTheme.displayMedium,
-                  ),
+                  Text(link.title, style: theme.textTheme.displayMedium),
 
                   const SizedBox(height: 8),
 
@@ -354,16 +360,16 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
                   if (link.publisherName != null) ...[
                     Row(
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.person_outline,
                           size: 16,
-                          color: NotionTheme.textGray,
+                          color: subtextColor,
                         ),
                         const SizedBox(width: 4),
                         Text(
                           link.publisherName!,
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: NotionTheme.textGray,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: subtextColor,
                           ),
                         ),
                       ],
@@ -376,17 +382,13 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
                     onTap: () => _launchUrl(link.url),
                     child: Row(
                       children: [
-                        const Icon(
-                          Icons.link,
-                          size: 16,
-                          color: Color(0xFF2382E2),
-                        ),
+                        Icon(Icons.link, size: 16, color: theme.primaryColor),
                         const SizedBox(width: 4),
                         Expanded(
                           child: Text(
                             link.url,
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: const Color(0xFF2382E2),
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.primaryColor,
                               decoration: TextDecoration.underline,
                             ),
                             maxLines: 1,
@@ -395,9 +397,11 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
                         ),
                         IconButton(
                           icon: const Icon(Icons.copy, size: 16),
-                          color: NotionTheme.textGray,
+                          color: subtextColor,
                           onPressed: () async {
-                            await Clipboard.setData(ClipboardData(text: link.url));
+                            await Clipboard.setData(
+                              ClipboardData(text: link.url),
+                            );
                             if (mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
@@ -414,7 +418,7 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
                   ),
 
                   const SizedBox(height: 16),
-                  const Divider(color: NotionTheme.dividerColor),
+                  Divider(color: borderColor),
                   const SizedBox(height: 16),
 
                   // AI Summary Section
@@ -423,20 +427,23 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
                       context,
                       icon: Icons.auto_awesome,
                       title: 'AI Summary',
-                      iconColor: const Color(0xFF9333EA),
+                      iconColor: theme.colorScheme.primary,
+                      textColor: subtextColor,
                     ),
                     const SizedBox(height: 8),
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFAF5FF),
+                        color: theme.colorScheme.primary.withOpacity(0.05),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFFE9D5FF)),
+                        border: Border.all(
+                          color: theme.colorScheme.primary.withOpacity(0.2),
+                        ),
                       ),
                       child: Text(
                         _translatedSummary ?? link.aiDescription!,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        style: theme.textTheme.bodyMedium?.copyWith(
                           height: 1.6,
                         ),
                       ),
@@ -450,21 +457,21 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
                       context,
                       icon: Icons.description_outlined,
                       title: 'Description',
+                      textColor: subtextColor,
                     ),
                     const SizedBox(height: 8),
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: NotionTheme.sidebarColor,
+                        color: sidebarColor,
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: NotionTheme.dividerColor),
+                        border: Border.all(color: borderColor),
                       ),
                       child: Text(
                         _translatedDescription ?? link.description!,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        style: theme.textTheme.bodyMedium?.copyWith(
                           height: 1.6,
-                          color: NotionTheme.textGray,
                         ),
                       ),
                     ),
@@ -472,13 +479,15 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
                   ],
 
                   // Translation Section
-                  if (link.aiDescription != null || link.description != null) ...[
-                    const Divider(color: NotionTheme.dividerColor),
+                  if (link.aiDescription != null ||
+                      link.description != null) ...[
+                    Divider(color: borderColor),
                     const SizedBox(height: 16),
                     _buildSectionHeader(
                       context,
                       icon: Icons.translate,
                       title: 'Translate',
+                      textColor: subtextColor,
                     ),
                     const SizedBox(height: 8),
                     Row(
@@ -487,19 +496,29 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 12),
                             decoration: BoxDecoration(
-                              color: NotionTheme.sidebarColor,
+                              color: sidebarColor,
                               borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: NotionTheme.dividerColor),
+                              border: Border.all(color: borderColor),
                             ),
                             child: DropdownButtonHideUnderline(
                               child: DropdownButton<String>(
                                 value: _selectedLanguage,
                                 isExpanded: true,
-                                icon: const Icon(Icons.keyboard_arrow_down),
+                                icon: Icon(
+                                  Icons.keyboard_arrow_down,
+                                  color: subtextColor,
+                                ),
+                                dropdownColor: isDark
+                                    ? NotionTheme.darkSurface
+                                    : Colors.white,
+                                style: TextStyle(color: textColor),
                                 items: _languages.map((lang) {
                                   return DropdownMenuItem(
                                     value: lang,
-                                    child: Text(lang),
+                                    child: Text(
+                                      lang,
+                                      style: TextStyle(color: textColor),
+                                    ),
                                   );
                                 }).toList(),
                                 onChanged: (value) {
@@ -526,10 +545,12 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
                                   ),
                                 )
                               : const Icon(Icons.translate, size: 18),
-                          label: Text(_isTranslating ? 'Translating...' : 'Translate'),
+                          label: Text(
+                            _isTranslating ? 'Translating...' : 'Translate',
+                          ),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: NotionTheme.primaryBlack,
-                            foregroundColor: Colors.white,
+                            backgroundColor: theme.primaryColor,
+                            foregroundColor: theme.colorScheme.onPrimary,
                             padding: const EdgeInsets.symmetric(
                               horizontal: 16,
                               vertical: 12,
@@ -537,18 +558,23 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8),
                             ),
+                            elevation: 0,
                           ),
                         ),
                       ],
                     ),
-                    if (_translatedSummary != null || _translatedDescription != null) ...[
+                    if (_translatedSummary != null ||
+                        _translatedDescription != null) ...[
                       const SizedBox(height: 8),
                       TextButton.icon(
                         onPressed: _clearTranslation,
-                        icon: const Icon(Icons.clear, size: 16),
-                        label: const Text('Show original'),
+                        icon: Icon(Icons.clear, size: 16, color: subtextColor),
+                        label: Text(
+                          'Show original',
+                          style: TextStyle(color: subtextColor),
+                        ),
                         style: TextButton.styleFrom(
-                          foregroundColor: NotionTheme.textGray,
+                          foregroundColor: subtextColor,
                         ),
                       ),
                     ],
@@ -557,12 +583,13 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
 
                   // Tags Section
                   if (link.tags.isNotEmpty) ...[
-                    const Divider(color: NotionTheme.dividerColor),
+                    Divider(color: borderColor),
                     const SizedBox(height: 16),
                     _buildSectionHeader(
                       context,
                       icon: Icons.tag,
                       title: 'Tags',
+                      textColor: subtextColor,
                     ),
                     const SizedBox(height: 8),
                     Wrap(
@@ -575,14 +602,13 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
                             vertical: 4,
                           ),
                           decoration: BoxDecoration(
-                            color: NotionTheme.sidebarColor,
+                            color: sidebarColor,
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: NotionTheme.dividerColor),
+                            border: Border.all(color: borderColor),
                           ),
                           child: Text(
                             '#$tag',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: NotionTheme.textGray,
+                            style: theme.textTheme.bodySmall?.copyWith(
                               fontWeight: FontWeight.w500,
                             ),
                           ),
@@ -593,12 +619,13 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
                   ],
 
                   // Metadata Section
-                  const Divider(color: NotionTheme.dividerColor),
+                  Divider(color: borderColor),
                   const SizedBox(height: 16),
                   _buildSectionHeader(
                     context,
                     icon: Icons.info_outline,
                     title: 'Details',
+                    textColor: subtextColor,
                   ),
                   const SizedBox(height: 8),
                   // Topic row with edit button
@@ -611,7 +638,9 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                        color: _getTopicColor(_currentTopic).withOpacity(0.1),
+                        color: _getTopicColor(
+                          _currentTopic,
+                        ).withOpacity(isDark ? 0.2 : 0.1),
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
                           color: _getTopicColor(_currentTopic).withOpacity(0.3),
@@ -628,7 +657,7 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
                           const SizedBox(width: 8),
                           Text(
                             _currentTopic.displayName,
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            style: theme.textTheme.bodyMedium?.copyWith(
                               color: _getTopicColor(_currentTopic),
                               fontWeight: FontWeight.w600,
                             ),
@@ -649,6 +678,8 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
                     icon: Icons.calendar_today_outlined,
                     label: 'Added',
                     value: DateFormat.yMMMd().add_jm().format(link.createdAt),
+                    textColor: textColor,
+                    subtextColor: subtextColor,
                   ),
 
                   const SizedBox(height: 24),
@@ -661,12 +692,13 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
                       icon: const Icon(Icons.open_in_new),
                       label: const Text('Open Link'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: NotionTheme.primaryBlack,
-                        foregroundColor: Colors.white,
+                        backgroundColor: theme.primaryColor,
+                        foregroundColor: theme.colorScheme.onPrimary,
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(12),
                         ),
+                        elevation: 0,
                       ),
                     ),
                   ),
@@ -686,20 +718,21 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
     required IconData icon,
     required String title,
     Color? iconColor,
+    Color? textColor,
   }) {
     return Row(
       children: [
         Icon(
           icon,
           size: 18,
-          color: iconColor ?? NotionTheme.textGray,
+          color: iconColor ?? textColor ?? NotionTheme.textGray,
         ),
         const SizedBox(width: 6),
         Text(
           title,
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
             fontWeight: FontWeight.w600,
-            color: NotionTheme.textGray,
+            color: textColor ?? NotionTheme.textGray,
           ),
         ),
       ],
@@ -711,25 +744,25 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
     required IconData icon,
     required String label,
     required String value,
+    Color? textColor,
+    Color? subtextColor,
   }) {
     return Row(
       children: [
-        Icon(
-          icon,
-          size: 16,
-          color: NotionTheme.textGray,
-        ),
+        Icon(icon, size: 16, color: subtextColor ?? NotionTheme.textGray),
         const SizedBox(width: 8),
         Text(
           '$label: ',
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: NotionTheme.textGray,
+            color: subtextColor ?? NotionTheme.textGray,
           ),
         ),
         Expanded(
           child: Text(
             value,
-            style: Theme.of(context).textTheme.bodyMedium,
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: textColor),
           ),
         ),
       ],
@@ -820,11 +853,7 @@ class _TopicSelectorSheet extends StatelessWidget {
                   color: color.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(
-                  _getTopicIcon(topic),
-                  size: 18,
-                  color: color,
-                ),
+                child: Icon(_getTopicIcon(topic), size: 18, color: color),
               ),
               title: Text(
                 topic.displayName,

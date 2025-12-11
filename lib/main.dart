@@ -5,23 +5,31 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'presentation/screens/add_link_screen.dart';
 import 'presentation/screens/folder_detail_screen.dart';
 import 'presentation/screens/home_screen.dart';
+import 'presentation/screens/splash_screen.dart';
 import 'presentation/theme/notion_theme.dart';
+import 'presentation/providers/theme_provider.dart';
 
 Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
   // Load environment variables
   try {
     await dotenv.load(fileName: ".env");
   } catch (e) {
     // If .env file doesn't exist or is empty, continue without it
-    print('Warning: Could not load .env file: $e');
+    debugPrint('Warning: Could not load .env file: $e');
   }
 
   runApp(const ProviderScope(child: LinkatApp()));
 }
 
 final _router = GoRouter(
-  initialLocation: '/',
+  initialLocation: '/splash',
   routes: [
+    GoRoute(
+      path: '/splash',
+      builder: (context, state) => const SplashScreen(),
+    ),
     GoRoute(
       path: '/',
       builder: (context, state) => const HomeScreen(),
@@ -46,14 +54,18 @@ final _router = GoRouter(
   ],
 );
 
-class LinkatApp extends StatelessWidget {
+class LinkatApp extends ConsumerWidget {
   const LinkatApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeMode = ref.watch(themeModeProvider);
+
     return MaterialApp.router(
       title: 'Linkat',
       theme: NotionTheme.lightTheme,
+      darkTheme: NotionTheme.darkTheme,
+      themeMode: themeMode,
       routerConfig: _router,
       debugShowCheckedModeBanner: false,
     );

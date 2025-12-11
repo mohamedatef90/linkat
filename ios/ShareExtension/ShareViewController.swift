@@ -1,136 +1,24 @@
 import UIKit
+import Social
+import MobileCoreServices
 import UniformTypeIdentifiers
 
 private let appGroupId = "group.com.example.linkat"
 private let pendingLinksKey = "PendingLinks"
+private let appURLScheme = "ShareMedia-com.example.linkat://"
 
 class ShareViewController: UIViewController {
 
-    // UI Elements
-    private let containerView = UIView()
-    private let titleLabel = UILabel()
-    private let nameTextField = UITextField()
-    private let urlLabel = UILabel()
-    private let cancelButton = UIButton(type: .system)
-    private let saveButton = UIButton(type: .system)
-    private let activityIndicator = UIActivityIndicatorView(style: .medium)
-
-    // Data
-    private var sharedURL: String = ""
-    private var originalTitle: String = ""
-
-    override func viewDidLoad() {
-        super.viewDidLoad()
-        setupUI()
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        // Ensure the view is transparent/minimal
+        view.backgroundColor = .clear
         extractSharedContent()
-    }
-
-    private func setupUI() {
-        // Semi-transparent background
-        view.backgroundColor = UIColor.black.withAlphaComponent(0.5)
-
-        // Container view (the dialog)
-        containerView.backgroundColor = .systemBackground
-        containerView.layer.cornerRadius = 16
-        containerView.layer.shadowColor = UIColor.black.cgColor
-        containerView.layer.shadowOpacity = 0.2
-        containerView.layer.shadowOffset = CGSize(width: 0, height: 4)
-        containerView.layer.shadowRadius = 12
-        containerView.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(containerView)
-
-        // Title label
-        titleLabel.text = "Save Link"
-        titleLabel.font = UIFont.systemFont(ofSize: 18, weight: .semibold)
-        titleLabel.textAlignment = .center
-        titleLabel.translatesAutoresizingMaskIntoConstraints = false
-        containerView.addSubview(titleLabel)
-
-        // Name text field
-        nameTextField.placeholder = "Link name"
-        nameTextField.borderStyle = .roundedRect
-        nameTextField.font = UIFont.systemFont(ofSize: 16)
-        nameTextField.backgroundColor = UIColor.secondarySystemBackground
-        nameTextField.translatesAutoresizingMaskIntoConstraints = false
-        containerView.addSubview(nameTextField)
-
-        // URL label
-        urlLabel.font = UIFont.systemFont(ofSize: 13)
-        urlLabel.textColor = .secondaryLabel
-        urlLabel.numberOfLines = 2
-        urlLabel.lineBreakMode = .byTruncatingMiddle
-        urlLabel.translatesAutoresizingMaskIntoConstraints = false
-        containerView.addSubview(urlLabel)
-
-        // Button container
-        let buttonStack = UIStackView()
-        buttonStack.axis = .horizontal
-        buttonStack.spacing = 12
-        buttonStack.distribution = .fillEqually
-        buttonStack.translatesAutoresizingMaskIntoConstraints = false
-        containerView.addSubview(buttonStack)
-
-        // Cancel button
-        cancelButton.setTitle("Cancel", for: .normal)
-        cancelButton.titleLabel?.font = UIFont.systemFont(ofSize: 16, weight: .medium)
-        cancelButton.backgroundColor = UIColor.secondarySystemBackground
-        cancelButton.setTitleColor(.label, for: .normal)
-        cancelButton.layer.cornerRadius = 10
-        cancelButton.addTarget(self, action: #selector(cancelTapped), for: .touchUpInside)
-        buttonStack.addArrangedSubview(cancelButton)
-
-        // Save button
-        saveButton.setTitle("Save", for: .normal)
-        saveButton.titleLabel?.font = UIFont.systemFont(ofSize: 16, weight: .semibold)
-        saveButton.backgroundColor = UIColor.systemBlue
-        saveButton.setTitleColor(.white, for: .normal)
-        saveButton.layer.cornerRadius = 10
-        saveButton.addTarget(self, action: #selector(saveTapped), for: .touchUpInside)
-        buttonStack.addArrangedSubview(saveButton)
-
-        // Activity indicator
-        activityIndicator.hidesWhenStopped = true
-        activityIndicator.translatesAutoresizingMaskIntoConstraints = false
-        containerView.addSubview(activityIndicator)
-
-        // Constraints
-        NSLayoutConstraint.activate([
-            containerView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            containerView.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-            containerView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 24),
-            containerView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -24),
-
-            titleLabel.topAnchor.constraint(equalTo: containerView.topAnchor, constant: 20),
-            titleLabel.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 16),
-            titleLabel.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -16),
-
-            nameTextField.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 20),
-            nameTextField.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 16),
-            nameTextField.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -16),
-            nameTextField.heightAnchor.constraint(equalToConstant: 44),
-
-            urlLabel.topAnchor.constraint(equalTo: nameTextField.bottomAnchor, constant: 8),
-            urlLabel.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 16),
-            urlLabel.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -16),
-
-            buttonStack.topAnchor.constraint(equalTo: urlLabel.bottomAnchor, constant: 24),
-            buttonStack.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 16),
-            buttonStack.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -16),
-            buttonStack.bottomAnchor.constraint(equalTo: containerView.bottomAnchor, constant: -20),
-            buttonStack.heightAnchor.constraint(equalToConstant: 50),
-
-            activityIndicator.centerXAnchor.constraint(equalTo: saveButton.centerXAnchor),
-            activityIndicator.centerYAnchor.constraint(equalTo: saveButton.centerYAnchor),
-        ])
-
-        // Tap outside to dismiss
-        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(backgroundTapped))
-        tapGesture.delegate = self
-        view.addGestureRecognizer(tapGesture)
     }
 
     private func extractSharedContent() {
         guard let extensionItems = extensionContext?.inputItems as? [NSExtensionItem] else {
+            self.completeRequest()
             return
         }
 
@@ -141,34 +29,35 @@ class ShareViewController: UIViewController {
                 // Try URL first
                 if provider.hasItemConformingToTypeIdentifier(UTType.url.identifier) {
                     provider.loadItem(forTypeIdentifier: UTType.url.identifier, options: nil) { [weak self] data, error in
-                        DispatchQueue.main.async {
-                            if let url = data as? URL {
-                                self?.handleExtractedURL(url.absoluteString)
-                            } else if let urlString = data as? String {
-                                self?.handleExtractedURL(urlString)
-                            }
+                        if let url = data as? URL {
+                            self?.handleExtractedURL(url.absoluteString)
+                        } else if let urlString = data as? String {
+                            self?.handleExtractedURL(urlString)
+                        } else {
+                            self?.completeRequest()
                         }
                     }
                     return
                 }
-                // Try plain text
+                // Try plain text that might contain a URL
                 else if provider.hasItemConformingToTypeIdentifier(UTType.plainText.identifier) {
                     provider.loadItem(forTypeIdentifier: UTType.plainText.identifier, options: nil) { [weak self] data, error in
-                        DispatchQueue.main.async {
-                            if let text = data as? String {
-                                // Try to extract URL from text
-                                self?.extractURLFromText(text)
-                            }
+                        if let text = data as? String {
+                            self?.extractURLFromText(text)
+                        } else {
+                            self?.completeRequest()
                         }
                     }
                     return
                 }
             }
         }
+        
+        // If no providers matched immediately
+        self.completeRequest()
     }
 
     private func extractURLFromText(_ text: String) {
-        // Try to find a URL in the text
         let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
         let matches = detector?.matches(in: text, options: [], range: NSRange(location: 0, length: text.utf16.count))
 
@@ -179,98 +68,364 @@ class ShareViewController: UIViewController {
                   url.scheme == "http" || url.scheme == "https" {
             handleExtractedURL(text.trimmingCharacters(in: .whitespacesAndNewlines))
         } else {
-            // No URL found
-            urlLabel.text = "No valid URL found"
-            saveButton.isEnabled = false
-            saveButton.backgroundColor = .systemGray
+            completeRequest()
         }
     }
 
     private func handleExtractedURL(_ urlString: String) {
-        sharedURL = urlString
-        urlLabel.text = urlString
+        // Save URL with placeholder title - the main app will fetch the proper title
+        saveLinkToSharedStorage(url: urlString, title: "")
 
-        // Extract title from URL or use domain name
-        if let url = URL(string: urlString), let host = url.host {
-            // Use domain name as default title
-            let domain = host.replacingOccurrences(of: "www.", with: "")
-            originalTitle = "Link from \(domain)"
-            nameTextField.text = originalTitle
-        } else {
-            originalTitle = "Shared Link"
-            nameTextField.text = originalTitle
-        }
-
-        // Try to fetch actual page title
-        fetchPageTitle(from: urlString)
+        // Open the main app
+        openMainApp()
     }
-
-    private func fetchPageTitle(from urlString: String) {
-        guard let url = URL(string: urlString) else { return }
-
-        var request = URLRequest(url: url)
-        request.timeoutInterval = 5
-
-        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
-            guard let data = data,
-                  let html = String(data: data, encoding: .utf8) else {
-                return
-            }
-
-            // Extract title from HTML
-            if let titleRange = html.range(of: "<title>"),
-               let endRange = html.range(of: "</title>") {
-                let title = String(html[titleRange.upperBound..<endRange.lowerBound])
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-                    .replacingOccurrences(of: "\n", with: " ")
-
-                if !title.isEmpty {
-                    DispatchQueue.main.async {
-                        self?.originalTitle = title
-                        self?.nameTextField.text = title
-                    }
-                }
-            }
-        }.resume()
-    }
-
-    @objc private func cancelTapped() {
-        extensionContext?.completeRequest(returningItems: nil, completionHandler: nil)
-    }
-
-    @objc private func saveTapped() {
-        guard !sharedURL.isEmpty else { return }
-
-        // Show loading state
-        saveButton.setTitle("", for: .normal)
-        activityIndicator.startAnimating()
-        saveButton.isEnabled = false
-        cancelButton.isEnabled = false
-
-        // Get the name (use original if empty)
-        let linkName = nameTextField.text?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
-            ? nameTextField.text!
-            : originalTitle
-
-        // Save to shared UserDefaults
-        saveLinkToSharedStorage(url: sharedURL, name: linkName)
-
-        // Brief delay to show feedback
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-            self?.showSuccessAndDismiss()
-        }
-    }
-
-    private func saveLinkToSharedStorage(url: String, name: String) {
-        guard let userDefaults = UserDefaults(suiteName: appGroupId) else {
-            print("ShareExtension Error: Could not access UserDefaults with app group: \(appGroupId)")
+    
+    private func fetchPageTitle(from urlString: String, completion: @escaping (String?) -> Void) {
+        guard let url = URL(string: urlString) else {
+            completion(nil)
             return
         }
 
-        // Create link data
+        // Check if we need platform-specific handling
+        let host = url.host?.lowercased() ?? ""
+
+        if host.contains("twitter.com") || host.contains("x.com") {
+            fetchTwitterMetadata(urlString: urlString, completion: completion)
+            return
+        }
+
+        if host.contains("youtube.com") || host.contains("youtu.be") {
+            fetchYouTubeMetadata(urlString: urlString, completion: completion)
+            return
+        }
+
+        // For Instagram, Facebook, and general URLs - try fetching with appropriate headers
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 5
+
+        // Use a bot user-agent to get OG tags (many sites serve better metadata to bots)
+        request.setValue("Mozilla/5.0 (compatible; Discordbot/2.0; +https://discordapp.com)", forHTTPHeaderField: "User-Agent")
+        request.setValue("text/html", forHTTPHeaderField: "Accept")
+
+        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+            guard let data = data, let html = String(data: data, encoding: .utf8) else {
+                completion(nil)
+                return
+            }
+
+            // Try OpenGraph title first (most reliable)
+            if let ogTitle = self?.extractMetaContent(from: html, property: "og:title"), !ogTitle.isEmpty {
+                completion(self?.decodeHTMLEntities(ogTitle))
+                return
+            }
+
+            // Try Twitter card title
+            if let twitterTitle = self?.extractMetaContent(from: html, property: "twitter:title"), !twitterTitle.isEmpty {
+                completion(self?.decodeHTMLEntities(twitterTitle))
+                return
+            }
+
+            // Fall back to <title> tag
+            if let title = self?.extractTitleTag(from: html), !title.isEmpty {
+                completion(self?.decodeHTMLEntities(title))
+                return
+            }
+
+            completion(nil)
+        }.resume()
+    }
+
+    // MARK: - Twitter/X Metadata
+
+    private func fetchTwitterMetadata(urlString: String, completion: @escaping (String?) -> Void) {
+        // Try fxtwitter API first (most reliable)
+        if let tweetInfo = extractTweetInfo(from: urlString) {
+            let apiUrl = "https://api.fxtwitter.com/\(tweetInfo.username)/status/\(tweetInfo.tweetId)"
+
+            guard let url = URL(string: apiUrl) else {
+                fetchWithVxTwitter(urlString: urlString, completion: completion)
+                return
+            }
+
+            var request = URLRequest(url: url)
+            request.timeoutInterval = 4
+            request.setValue("application/json", forHTTPHeaderField: "Accept")
+
+            URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+                guard let data = data,
+                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                      let tweet = json["tweet"] as? [String: Any],
+                      let text = tweet["text"] as? String, !text.isEmpty else {
+                    // Fallback to vxtwitter
+                    self?.fetchWithVxTwitter(urlString: urlString, completion: completion)
+                    return
+                }
+
+                let title = text.count > 120 ? String(text.prefix(120)) + "..." : text
+                completion(title)
+            }.resume()
+        } else {
+            fetchWithVxTwitter(urlString: urlString, completion: completion)
+        }
+    }
+
+    private func fetchWithVxTwitter(urlString: String, completion: @escaping (String?) -> Void) {
+        let vxUrl = urlString
+            .replacingOccurrences(of: "twitter.com", with: "vxtwitter.com")
+            .replacingOccurrences(of: "x.com", with: "vxtwitter.com")
+
+        guard let url = URL(string: vxUrl) else {
+            completion(nil)
+            return
+        }
+
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 4
+        request.setValue("Mozilla/5.0 (compatible; Discordbot/2.0; +https://discordapp.com)", forHTTPHeaderField: "User-Agent")
+
+        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+            guard let data = data, let html = String(data: data, encoding: .utf8) else {
+                completion(nil)
+                return
+            }
+
+            // Try og:description for tweets (contains the tweet text)
+            if let description = self?.extractMetaContent(from: html, property: "og:description"),
+               !description.isEmpty {
+                let title = description.count > 120 ? String(description.prefix(120)) + "..." : description
+                completion(self?.decodeHTMLEntities(title))
+                return
+            }
+
+            if let ogTitle = self?.extractMetaContent(from: html, property: "og:title"), !ogTitle.isEmpty {
+                completion(self?.decodeHTMLEntities(ogTitle))
+                return
+            }
+
+            completion(nil)
+        }.resume()
+    }
+
+    private func extractTweetInfo(from urlString: String) -> (username: String, tweetId: String)? {
+        guard let url = URL(string: urlString) else { return nil }
+        let pathComponents = url.pathComponents.filter { $0 != "/" }
+
+        // Pattern: /username/status/tweetId
+        if pathComponents.count >= 3 && pathComponents[1] == "status" {
+            let tweetId = pathComponents[2].components(separatedBy: "?").first ?? pathComponents[2]
+            return (pathComponents[0], tweetId)
+        }
+        return nil
+    }
+
+    // MARK: - YouTube Metadata
+
+    private func fetchYouTubeMetadata(urlString: String, completion: @escaping (String?) -> Void) {
+        guard let videoId = extractYouTubeVideoId(from: urlString) else {
+            completion("YouTube Video")
+            return
+        }
+
+        let oembedUrl = "https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=\(videoId)&format=json"
+
+        guard let url = URL(string: oembedUrl) else {
+            completion("YouTube Video")
+            return
+        }
+
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 4
+
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            guard let data = data,
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let title = json["title"] as? String, !title.isEmpty else {
+                completion("YouTube Video")
+                return
+            }
+
+            completion(title)
+        }.resume()
+    }
+
+    private func extractYouTubeVideoId(from urlString: String) -> String? {
+        guard let url = URL(string: urlString) else { return nil }
+        let host = url.host?.lowercased() ?? ""
+
+        // youtube.com/shorts/VIDEO_ID or youtube.com/watch?v=VIDEO_ID
+        if host.contains("youtube.com") {
+            if url.path.contains("/shorts/") {
+                let pathComponents = url.pathComponents
+                if let shortsIndex = pathComponents.firstIndex(of: "shorts"),
+                   shortsIndex + 1 < pathComponents.count {
+                    return pathComponents[shortsIndex + 1].components(separatedBy: "?").first
+                }
+            }
+            // Regular watch URL
+            if let queryItems = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems,
+               let vParam = queryItems.first(where: { $0.name == "v" })?.value {
+                return vParam
+            }
+        }
+
+        // youtu.be/VIDEO_ID
+        if host.contains("youtu.be") {
+            let pathComponents = url.pathComponents.filter { $0 != "/" }
+            if let videoId = pathComponents.first {
+                return videoId.components(separatedBy: "?").first
+            }
+        }
+
+        return nil
+    }
+
+    // MARK: - HTML Parsing Helpers
+
+    private func extractMetaContent(from html: String, property: String) -> String? {
+        // Try property attribute first (OpenGraph style)
+        let propertyPattern = "<meta[^>]+property=[\"']\(property)[\"'][^>]+content=[\"']([^\"']*)[\"']"
+        if let match = html.range(of: propertyPattern, options: .regularExpression) {
+            let matchString = String(html[match])
+            if let contentMatch = matchString.range(of: "content=[\"']([^\"']*)[\"']", options: .regularExpression) {
+                var content = String(matchString[contentMatch])
+                content = content.replacingOccurrences(of: "content=\"", with: "")
+                    .replacingOccurrences(of: "content='", with: "")
+                if content.hasSuffix("\"") || content.hasSuffix("'") {
+                    content = String(content.dropLast())
+                }
+                return content.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+        }
+
+        // Try content before property (some sites use this order)
+        let reversePattern = "<meta[^>]+content=[\"']([^\"']*)[\"'][^>]+property=[\"']\(property)[\"']"
+        if let match = html.range(of: reversePattern, options: .regularExpression) {
+            let matchString = String(html[match])
+            if let contentMatch = matchString.range(of: "content=[\"']([^\"']*)[\"']", options: .regularExpression) {
+                var content = String(matchString[contentMatch])
+                content = content.replacingOccurrences(of: "content=\"", with: "")
+                    .replacingOccurrences(of: "content='", with: "")
+                if content.hasSuffix("\"") || content.hasSuffix("'") {
+                    content = String(content.dropLast())
+                }
+                return content.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+        }
+
+        // Try name attribute (Twitter cards style)
+        let namePattern = "<meta[^>]+name=[\"']\(property)[\"'][^>]+content=[\"']([^\"']*)[\"']"
+        if let match = html.range(of: namePattern, options: .regularExpression) {
+            let matchString = String(html[match])
+            if let contentMatch = matchString.range(of: "content=[\"']([^\"']*)[\"']", options: .regularExpression) {
+                var content = String(matchString[contentMatch])
+                content = content.replacingOccurrences(of: "content=\"", with: "")
+                    .replacingOccurrences(of: "content='", with: "")
+                if content.hasSuffix("\"") || content.hasSuffix("'") {
+                    content = String(content.dropLast())
+                }
+                return content.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+        }
+
+        return nil
+    }
+
+    private func extractTitleTag(from html: String) -> String? {
+        // Handle both <title> and <title ...>
+        guard let startRange = html.range(of: "<title", options: .caseInsensitive) else { return nil }
+
+        // Find the closing > of the opening tag
+        guard let tagEndRange = html.range(of: ">", range: startRange.upperBound..<html.endIndex) else { return nil }
+
+        // Find </title>
+        guard let endRange = html.range(of: "</title>", options: .caseInsensitive, range: tagEndRange.upperBound..<html.endIndex) else { return nil }
+
+        let title = String(html[tagEndRange.upperBound..<endRange.lowerBound])
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "\n", with: " ")
+            .replacingOccurrences(of: "\r", with: "")
+
+        return title.isEmpty ? nil : title
+    }
+
+    private func decodeHTMLEntities(_ string: String) -> String {
+        var result = string
+
+        // Common HTML entities
+        let entities: [String: String] = [
+            "&amp;": "&",
+            "&lt;": "<",
+            "&gt;": ">",
+            "&quot;": "\"",
+            "&apos;": "'",
+            "&#39;": "'",
+            "&nbsp;": " ",
+            "&#x27;": "'",
+            "&#x2F;": "/",
+            "&#x60;": "`",
+            "&mdash;": "—",
+            "&ndash;": "–",
+            "&hellip;": "…",
+            "&copy;": "©",
+            "&reg;": "®",
+            "&trade;": "™",
+            "&lsquo;": "\u{2018}",
+            "&rsquo;": "\u{2019}",
+            "&ldquo;": "\u{201C}",
+            "&rdquo;": "\u{201D}",
+        ]
+
+        for (entity, replacement) in entities {
+            result = result.replacingOccurrences(of: entity, with: replacement)
+        }
+
+        // Handle numeric entities like &#123; or &#x7B;
+        // Decimal
+        let decimalPattern = "&#(\\d+);"
+        if let regex = try? NSRegularExpression(pattern: decimalPattern) {
+            let range = NSRange(result.startIndex..., in: result)
+            let matches = regex.matches(in: result, range: range).reversed()
+            for match in matches {
+                if let codeRange = Range(match.range(at: 1), in: result),
+                   let code = Int(result[codeRange]),
+                   let scalar = Unicode.Scalar(code) {
+                    let char = String(Character(scalar))
+                    if let fullRange = Range(match.range, in: result) {
+                        result.replaceSubrange(fullRange, with: char)
+                    }
+                }
+            }
+        }
+
+        // Hexadecimal
+        let hexPattern = "&#x([0-9a-fA-F]+);"
+        if let regex = try? NSRegularExpression(pattern: hexPattern) {
+            let range = NSRange(result.startIndex..., in: result)
+            let matches = regex.matches(in: result, range: range).reversed()
+            for match in matches {
+                if let codeRange = Range(match.range(at: 1), in: result),
+                   let code = Int(result[codeRange], radix: 16),
+                   let scalar = Unicode.Scalar(code) {
+                    let char = String(Character(scalar))
+                    if let fullRange = Range(match.range, in: result) {
+                        result.replaceSubrange(fullRange, with: char)
+                    }
+                }
+            }
+        }
+
+        return result
+    }
+    
+    private func saveLinkToSharedStorage(url: String, title: String) {
+        guard let userDefaults = UserDefaults(suiteName: appGroupId) else {
+            return
+        }
+
+        // Create link data with the fetched title
         let linkData: [String: Any] = [
             "url": url,
-            "title": name,
+            "title": title,
             "createdAt": Date().timeIntervalSince1970
         ]
 
@@ -285,39 +440,40 @@ class ShareViewController: UIViewController {
         // Add new link
         pendingLinks.append(linkData)
 
-        // Save as JSON string (more reliable across processes)
+        // Save
         if let jsonData = try? JSONSerialization.data(withJSONObject: pendingLinks),
            let jsonString = String(data: jsonData, encoding: .utf8) {
             userDefaults.set(jsonString, forKey: pendingLinksKey)
             userDefaults.synchronize()
-            print("ShareExtension: Saved link to UserDefaults - \(jsonString)")
-        } else {
-            print("ShareExtension Error: Failed to encode JSON")
         }
     }
 
-    private func showSuccessAndDismiss() {
-        // Update UI to show success
-        activityIndicator.stopAnimating()
-        saveButton.setTitle("✓ Saved", for: .normal)
-        saveButton.backgroundColor = UIColor.systemGreen
-
-        // Dismiss after brief delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-            self?.extensionContext?.completeRequest(returningItems: nil, completionHandler: nil)
+    private func openMainApp() {
+        guard let url = URL(string: appURLScheme) else {
+            completeRequest()
+            return
         }
+        
+        let selector = sel_registerName("openURL:")
+        var responder: UIResponder? = self
+        
+        while let r = responder {
+            if r.responds(to: selector) {
+                DispatchQueue.main.async {
+                    r.perform(selector, with: url)
+                }
+                break
+            }
+            responder = r.next
+        }
+        
+        // Close extension
+        completeRequest()
     }
-
-    @objc private func backgroundTapped() {
-        // Dismiss keyboard if open
-        nameTextField.resignFirstResponder()
-    }
-}
-
-// MARK: - UIGestureRecognizerDelegate
-extension ShareViewController: UIGestureRecognizerDelegate {
-    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
-        // Only handle taps outside the container view
-        return !containerView.frame.contains(touch.location(in: view))
+    
+    private func completeRequest() {
+        DispatchQueue.main.async {
+            self.extensionContext?.completeRequest(returningItems: nil, completionHandler: nil)
+        }
     }
 }

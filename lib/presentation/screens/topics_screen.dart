@@ -60,9 +60,10 @@ class _TopicsScreenState extends ConsumerState<TopicsScreen> {
   }
 
   void _showAssignTopicDialog() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: isDark ? NotionTheme.darkSurface : Colors.white,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
@@ -81,9 +82,10 @@ class _TopicsScreenState extends ConsumerState<TopicsScreen> {
   }
 
   void _showCategorySettings() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: isDark ? NotionTheme.darkSurface : Colors.white,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),

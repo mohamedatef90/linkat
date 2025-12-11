@@ -22,50 +22,61 @@ const LinkModelSchema = CollectionSchema(
       name: r'aiDescription',
       type: IsarType.string,
     ),
-    r'createdAt': PropertySchema(
+    r'contentType': PropertySchema(
       id: 1,
+      name: r'contentType',
+      type: IsarType.byte,
+      enumMap: _LinkModelcontentTypeEnumValueMap,
+    ),
+    r'createdAt': PropertySchema(
+      id: 2,
       name: r'createdAt',
       type: IsarType.dateTime,
     ),
+    r'customCategoryId': PropertySchema(
+      id: 3,
+      name: r'customCategoryId',
+      type: IsarType.long,
+    ),
     r'description': PropertySchema(
-      id: 2,
+      id: 4,
       name: r'description',
       type: IsarType.string,
     ),
     r'imageUrl': PropertySchema(
-      id: 3,
+      id: 5,
       name: r'imageUrl',
       type: IsarType.string,
     ),
     r'platform': PropertySchema(
-      id: 4,
+      id: 6,
       name: r'platform',
       type: IsarType.byte,
       enumMap: _LinkModelplatformEnumValueMap,
     ),
     r'publisherName': PropertySchema(
-      id: 5,
+      id: 7,
       name: r'publisherName',
       type: IsarType.string,
     ),
     r'tags': PropertySchema(
-      id: 6,
+      id: 8,
       name: r'tags',
       type: IsarType.stringList,
     ),
     r'title': PropertySchema(
-      id: 7,
+      id: 9,
       name: r'title',
       type: IsarType.string,
     ),
     r'topic': PropertySchema(
-      id: 8,
+      id: 10,
       name: r'topic',
       type: IsarType.byte,
       enumMap: _LinkModeltopicEnumValueMap,
     ),
     r'url': PropertySchema(
-      id: 9,
+      id: 11,
       name: r'url',
       type: IsarType.string,
     )
@@ -133,15 +144,17 @@ void _linkModelSerialize(
   Map<Type, List<int>> allOffsets,
 ) {
   writer.writeString(offsets[0], object.aiDescription);
-  writer.writeDateTime(offsets[1], object.createdAt);
-  writer.writeString(offsets[2], object.description);
-  writer.writeString(offsets[3], object.imageUrl);
-  writer.writeByte(offsets[4], object.platform.index);
-  writer.writeString(offsets[5], object.publisherName);
-  writer.writeStringList(offsets[6], object.tags);
-  writer.writeString(offsets[7], object.title);
-  writer.writeByte(offsets[8], object.topic.index);
-  writer.writeString(offsets[9], object.url);
+  writer.writeByte(offsets[1], object.contentType.index);
+  writer.writeDateTime(offsets[2], object.createdAt);
+  writer.writeLong(offsets[3], object.customCategoryId);
+  writer.writeString(offsets[4], object.description);
+  writer.writeString(offsets[5], object.imageUrl);
+  writer.writeByte(offsets[6], object.platform.index);
+  writer.writeString(offsets[7], object.publisherName);
+  writer.writeStringList(offsets[8], object.tags);
+  writer.writeString(offsets[9], object.title);
+  writer.writeByte(offsets[10], object.topic.index);
+  writer.writeString(offsets[11], object.url);
 }
 
 LinkModel _linkModelDeserialize(
@@ -152,20 +165,24 @@ LinkModel _linkModelDeserialize(
 ) {
   final object = LinkModel();
   object.aiDescription = reader.readStringOrNull(offsets[0]);
-  object.createdAt = reader.readDateTime(offsets[1]);
-  object.description = reader.readStringOrNull(offsets[2]);
+  object.contentType =
+      _LinkModelcontentTypeValueEnumMap[reader.readByteOrNull(offsets[1])] ??
+          ContentType.video;
+  object.createdAt = reader.readDateTime(offsets[2]);
+  object.customCategoryId = reader.readLongOrNull(offsets[3]);
+  object.description = reader.readStringOrNull(offsets[4]);
   object.id = id;
-  object.imageUrl = reader.readStringOrNull(offsets[3]);
+  object.imageUrl = reader.readStringOrNull(offsets[5]);
   object.platform =
-      _LinkModelplatformValueEnumMap[reader.readByteOrNull(offsets[4])] ??
+      _LinkModelplatformValueEnumMap[reader.readByteOrNull(offsets[6])] ??
           PlatformType.facebook;
-  object.publisherName = reader.readStringOrNull(offsets[5]);
-  object.tags = reader.readStringList(offsets[6]) ?? [];
-  object.title = reader.readString(offsets[7]);
+  object.publisherName = reader.readStringOrNull(offsets[7]);
+  object.tags = reader.readStringList(offsets[8]) ?? [];
+  object.title = reader.readString(offsets[9]);
   object.topic =
-      _LinkModeltopicValueEnumMap[reader.readByteOrNull(offsets[8])] ??
+      _LinkModeltopicValueEnumMap[reader.readByteOrNull(offsets[10])] ??
           TopicType.aiTech;
-  object.url = reader.readString(offsets[9]);
+  object.url = reader.readString(offsets[11]);
   return object;
 }
 
@@ -179,30 +196,64 @@ P _linkModelDeserializeProp<P>(
     case 0:
       return (reader.readStringOrNull(offset)) as P;
     case 1:
-      return (reader.readDateTime(offset)) as P;
+      return (_LinkModelcontentTypeValueEnumMap[
+              reader.readByteOrNull(offset)] ??
+          ContentType.video) as P;
     case 2:
-      return (reader.readStringOrNull(offset)) as P;
+      return (reader.readDateTime(offset)) as P;
     case 3:
-      return (reader.readStringOrNull(offset)) as P;
+      return (reader.readLongOrNull(offset)) as P;
     case 4:
-      return (_LinkModelplatformValueEnumMap[reader.readByteOrNull(offset)] ??
-          PlatformType.facebook) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 5:
       return (reader.readStringOrNull(offset)) as P;
     case 6:
-      return (reader.readStringList(offset) ?? []) as P;
+      return (_LinkModelplatformValueEnumMap[reader.readByteOrNull(offset)] ??
+          PlatformType.facebook) as P;
     case 7:
-      return (reader.readString(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 8:
+      return (reader.readStringList(offset) ?? []) as P;
+    case 9:
+      return (reader.readString(offset)) as P;
+    case 10:
       return (_LinkModeltopicValueEnumMap[reader.readByteOrNull(offset)] ??
           TopicType.aiTech) as P;
-    case 9:
+    case 11:
       return (reader.readString(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
   }
 }
 
+const _LinkModelcontentTypeEnumValueMap = {
+  'video': 0,
+  'reel': 1,
+  'short': 2,
+  'post': 3,
+  'article': 4,
+  'image': 5,
+  'story': 6,
+  'thread': 7,
+  'podcast': 8,
+  'music': 9,
+  'profile': 10,
+  'other': 11,
+};
+const _LinkModelcontentTypeValueEnumMap = {
+  0: ContentType.video,
+  1: ContentType.reel,
+  2: ContentType.short,
+  3: ContentType.post,
+  4: ContentType.article,
+  5: ContentType.image,
+  6: ContentType.story,
+  7: ContentType.thread,
+  8: ContentType.podcast,
+  9: ContentType.music,
+  10: ContentType.profile,
+  11: ContentType.other,
+};
 const _LinkModelplatformEnumValueMap = {
   'facebook': 0,
   'instagram': 1,
@@ -221,21 +272,23 @@ const _LinkModelplatformValueEnumMap = {
 };
 const _LinkModeltopicEnumValueMap = {
   'aiTech': 0,
-  'productUX': 1,
-  'design': 2,
-  'business': 3,
-  'science': 4,
-  'entertainment': 5,
-  'other': 6,
+  'development': 1,
+  'productUX': 2,
+  'design': 3,
+  'business': 4,
+  'science': 5,
+  'entertainment': 6,
+  'other': 7,
 };
 const _LinkModeltopicValueEnumMap = {
   0: TopicType.aiTech,
-  1: TopicType.productUX,
-  2: TopicType.design,
-  3: TopicType.business,
-  4: TopicType.science,
-  5: TopicType.entertainment,
-  6: TopicType.other,
+  1: TopicType.development,
+  2: TopicType.productUX,
+  3: TopicType.design,
+  4: TopicType.business,
+  5: TopicType.science,
+  6: TopicType.entertainment,
+  7: TopicType.other,
 };
 
 Id _linkModelGetId(LinkModel object) {
@@ -483,6 +536,60 @@ extension LinkModelQueryFilter
     });
   }
 
+  QueryBuilder<LinkModel, LinkModel, QAfterFilterCondition> contentTypeEqualTo(
+      ContentType value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'contentType',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterFilterCondition>
+      contentTypeGreaterThan(
+    ContentType value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'contentType',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterFilterCondition> contentTypeLessThan(
+    ContentType value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'contentType',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterFilterCondition> contentTypeBetween(
+    ContentType lower,
+    ContentType upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'contentType',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
   QueryBuilder<LinkModel, LinkModel, QAfterFilterCondition> createdAtEqualTo(
       DateTime value) {
     return QueryBuilder.apply(this, (query) {
@@ -529,6 +636,80 @@ extension LinkModelQueryFilter
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.between(
         property: r'createdAt',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterFilterCondition>
+      customCategoryIdIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'customCategoryId',
+      ));
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterFilterCondition>
+      customCategoryIdIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'customCategoryId',
+      ));
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterFilterCondition>
+      customCategoryIdEqualTo(int? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'customCategoryId',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterFilterCondition>
+      customCategoryIdGreaterThan(
+    int? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'customCategoryId',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterFilterCondition>
+      customCategoryIdLessThan(
+    int? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'customCategoryId',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterFilterCondition>
+      customCategoryIdBetween(
+    int? lower,
+    int? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'customCategoryId',
         lower: lower,
         includeLower: includeLower,
         upper: upper,
@@ -1649,6 +1830,18 @@ extension LinkModelQuerySortBy on QueryBuilder<LinkModel, LinkModel, QSortBy> {
     });
   }
 
+  QueryBuilder<LinkModel, LinkModel, QAfterSortBy> sortByContentType() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'contentType', Sort.asc);
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterSortBy> sortByContentTypeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'contentType', Sort.desc);
+    });
+  }
+
   QueryBuilder<LinkModel, LinkModel, QAfterSortBy> sortByCreatedAt() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'createdAt', Sort.asc);
@@ -1658,6 +1851,19 @@ extension LinkModelQuerySortBy on QueryBuilder<LinkModel, LinkModel, QSortBy> {
   QueryBuilder<LinkModel, LinkModel, QAfterSortBy> sortByCreatedAtDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'createdAt', Sort.desc);
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterSortBy> sortByCustomCategoryId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'customCategoryId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterSortBy>
+      sortByCustomCategoryIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'customCategoryId', Sort.desc);
     });
   }
 
@@ -1760,6 +1966,18 @@ extension LinkModelQuerySortThenBy
     });
   }
 
+  QueryBuilder<LinkModel, LinkModel, QAfterSortBy> thenByContentType() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'contentType', Sort.asc);
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterSortBy> thenByContentTypeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'contentType', Sort.desc);
+    });
+  }
+
   QueryBuilder<LinkModel, LinkModel, QAfterSortBy> thenByCreatedAt() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'createdAt', Sort.asc);
@@ -1769,6 +1987,19 @@ extension LinkModelQuerySortThenBy
   QueryBuilder<LinkModel, LinkModel, QAfterSortBy> thenByCreatedAtDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'createdAt', Sort.desc);
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterSortBy> thenByCustomCategoryId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'customCategoryId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterSortBy>
+      thenByCustomCategoryIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'customCategoryId', Sort.desc);
     });
   }
 
@@ -1879,9 +2110,21 @@ extension LinkModelQueryWhereDistinct
     });
   }
 
+  QueryBuilder<LinkModel, LinkModel, QDistinct> distinctByContentType() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'contentType');
+    });
+  }
+
   QueryBuilder<LinkModel, LinkModel, QDistinct> distinctByCreatedAt() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'createdAt');
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QDistinct> distinctByCustomCategoryId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'customCategoryId');
     });
   }
 
@@ -1954,9 +2197,21 @@ extension LinkModelQueryProperty
     });
   }
 
+  QueryBuilder<LinkModel, ContentType, QQueryOperations> contentTypeProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'contentType');
+    });
+  }
+
   QueryBuilder<LinkModel, DateTime, QQueryOperations> createdAtProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'createdAt');
+    });
+  }
+
+  QueryBuilder<LinkModel, int?, QQueryOperations> customCategoryIdProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'customCategoryId');
     });
   }
 

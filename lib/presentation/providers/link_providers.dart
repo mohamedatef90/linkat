@@ -6,9 +6,11 @@ import '../../data/services/topic_classification_service.dart';
 import '../../data/services/ai_description_service.dart';
 import '../../data/services/ai_classification_service.dart';
 import '../../data/services/ai_search_service.dart';
+import '../../data/services/content_type_detection_service.dart';
 import '../../domain/entities/link.dart';
 import '../../domain/entities/platform_type.dart';
 import '../../domain/entities/topic_type.dart';
+import '../../domain/entities/custom_category.dart';
 import '../../domain/repositories/i_link_repository.dart';
 import '../../domain/usecases/delete_link.dart';
 import '../../domain/usecases/get_links.dart';
@@ -43,6 +45,12 @@ final aiSearchServiceProvider = Provider<AiSearchService>((ref) {
 final topicClassificationServiceProvider = Provider<TopicClassificationService>(
   (ref) {
     return TopicClassificationService();
+  },
+);
+
+final contentTypeDetectionServiceProvider = Provider<ContentTypeDetectionService>(
+  (ref) {
+    return ContentTypeDetectionService();
   },
 );
 
@@ -111,4 +119,41 @@ final findLinkByUrlProvider = FutureProvider.family<Link?, String>((
 ) async {
   final repository = ref.watch(linkRepositoryProvider);
   return repository.findByUrl(url);
+});
+
+// Custom Category Providers
+final customCategoriesProvider = FutureProvider<List<CustomCategory>>((ref) async {
+  final repository = ref.watch(linkRepositoryProvider);
+  return repository.getCustomCategories();
+});
+
+final customCategoryProvider = FutureProvider.family<CustomCategory?, int>((
+  ref,
+  id,
+) async {
+  final repository = ref.watch(linkRepositoryProvider);
+  return repository.getCustomCategory(id);
+});
+
+final saveCustomCategoryProvider = Provider<Future<void> Function(CustomCategory)>((ref) {
+  final repository = ref.watch(linkRepositoryProvider);
+  return (CustomCategory category) => repository.saveCustomCategory(category);
+});
+
+final updateCustomCategoryProvider = Provider<Future<void> Function(CustomCategory)>((ref) {
+  final repository = ref.watch(linkRepositoryProvider);
+  return (CustomCategory category) => repository.updateCustomCategory(category);
+});
+
+final deleteCustomCategoryProvider = Provider<Future<void> Function(int)>((ref) {
+  final repository = ref.watch(linkRepositoryProvider);
+  return (int id) => repository.deleteCustomCategory(id);
+});
+
+final linksByCustomCategoryProvider = FutureProvider.family<List<Link>, int>((
+  ref,
+  categoryId,
+) async {
+  final repository = ref.watch(linkRepositoryProvider);
+  return repository.getLinksByCustomCategory(categoryId);
 });

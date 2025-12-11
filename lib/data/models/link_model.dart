@@ -2,6 +2,7 @@ import 'package:isar/isar.dart';
 import '../../domain/entities/link.dart';
 import '../../domain/entities/platform_type.dart';
 import '../../domain/entities/topic_type.dart';
+import '../../domain/entities/content_type.dart';
 
 part 'link_model.g.dart';
 
@@ -22,9 +23,14 @@ class LinkModel {
   @enumerated
   late TopicType topic;
 
+  @enumerated
+  ContentType contentType = ContentType.other;
+
   List<String> tags = [];
 
   late DateTime createdAt;
+
+  int? customCategoryId;
 
   Link toEntity() {
     return Link(
@@ -37,8 +43,10 @@ class LinkModel {
       aiDescription: aiDescription,
       platform: platform,
       topic: topic,
+      contentType: contentType,
       tags: tags,
       createdAt: createdAt,
+      customCategoryId: customCategoryId,
     );
   }
 
@@ -53,7 +61,9 @@ class LinkModel {
       ..aiDescription = link.aiDescription
       ..platform = link.platform
       ..topic = link.topic
+      ..contentType = link.contentType
       ..tags = link.tags
-      ..createdAt = link.createdAt;
+      ..createdAt = link.createdAt
+      ..customCategoryId = link.customCategoryId;
   }
 }

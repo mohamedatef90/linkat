@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../domain/entities/custom_category.dart';
 import '../../domain/entities/link.dart';
 import '../../domain/entities/topic_type.dart';
 import '../providers/link_providers.dart';
@@ -9,7 +10,13 @@ import '../theme/notion_theme.dart';
 class AddLinkScreen extends ConsumerStatefulWidget {
   final String? initialUrl;
   final String? initialTopic;
-  const AddLinkScreen({super.key, this.initialUrl, this.initialTopic});
+  final int? initialCustomCategoryId;
+  const AddLinkScreen({
+    super.key,
+    this.initialUrl,
+    this.initialTopic,
+    this.initialCustomCategoryId,
+  });
 
   @override
   ConsumerState<AddLinkScreen> createState() => _AddLinkScreenState();
@@ -23,13 +30,21 @@ class _AddLinkScreenState extends ConsumerState<AddLinkScreen> {
   bool _isLoading = false;
   String? _error;
   TopicType? _manualTopic;
-  List<String> _selectedTags = [];
+  CustomCategory? _selectedCustomCategory;
+  final List<String> _selectedTags = [];
   List<String> _availableTags = [];
   bool _showAdvanced = false;
 
   @override
   void initState() {
     super.initState();
+    // Initialize selected custom category if ID provided
+    if (widget.initialCustomCategoryId != null) {
+      // We'll try to find the category when the provider loads
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _loadInitialCategory();
+      });
+    }
     _urlController = TextEditingController(text: widget.initialUrl);
     _titleController = TextEditingController();
     _descriptionController = TextEditingController();
@@ -45,6 +60,59 @@ class _AddLinkScreenState extends ConsumerState<AddLinkScreen> {
       }
     }
     _loadTags();
+
+    // Fetch metadata if URL is provided
+    if (widget.initialUrl != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _fetchMetadata(widget.initialUrl!);
+      });
+    }
+  }
+
+  Future<void> _fetchMetadata(String url) async {
+    // Only fetch if title/description are empty
+    if (_titleController.text.isNotEmpty &&
+        _descriptionController.text.isNotEmpty) {
+      return;
+    }
+
+    try {
+      final metadataService = ref.read(metadataServiceProvider);
+      final metadata = await metadataService.fetchMetadata(url);
+
+      if (mounted) {
+        setState(() {
+          if (_titleController.text.isEmpty && metadata['title'] != null) {
+            _titleController.text = metadata['title']!;
+          }
+          if (_descriptionController.text.isEmpty &&
+              metadata['description'] != null) {
+            _descriptionController.text = metadata['description']!;
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching metadata: $e');
+    }
+  }
+
+  Future<void> _loadInitialCategory() async {
+    if (widget.initialCustomCategoryId == null) return;
+
+    try {
+      final categories = await ref.read(customCategoriesProvider.future);
+      final category = categories.firstWhere(
+        (c) => c.id == widget.initialCustomCategoryId,
+        orElse: () => throw Exception('Category not found'),
+      );
+      if (mounted) {
+        setState(() {
+          _selectedCustomCategory = category;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading initial category: $e');
+    }
   }
 
   Future<void> _loadTags() async {
@@ -175,7 +243,11 @@ class _AddLinkScreenState extends ConsumerState<AddLinkScreen> {
       builder: (context) => AlertDialog(
         title: Row(
           children: [
-            Icon(Icons.warning_amber_rounded, color: Colors.orange[700], size: 28),
+            Icon(
+              Icons.warning_amber_rounded,
+              color: Colors.orange[700],
+              size: 28,
+            ),
             const SizedBox(width: 12),
             const Text('Duplicate Link'),
           ],
@@ -211,10 +283,7 @@ class _AddLinkScreenState extends ConsumerState<AddLinkScreen> {
                   const SizedBox(height: 4),
                   Text(
                     existingLink.url,
-                    style: TextStyle(
-                      color: NotionTheme.textGray,
-                      fontSize: 12,
-                    ),
+                    style: TextStyle(color: NotionTheme.textGray, fontSize: 12),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -227,7 +296,9 @@ class _AddLinkScreenState extends ConsumerState<AddLinkScreen> {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: _getTopicColor(existingLink.topic).withOpacity(0.1),
+                          color: _getTopicColor(
+                            existingLink.topic,
+                          ).withOpacity(0.1),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
@@ -346,6 +417,14 @@ class _AddLinkScreenState extends ConsumerState<AddLinkScreen> {
         existingDescription: description,
       );
 
+      // Detect content type from URL and metadata
+      final contentTypeService = ref.read(contentTypeDetectionServiceProvider);
+      final contentType = contentTypeService.detectContentType(
+        url,
+        platform,
+        metadata['contentType'],
+      );
+
       final link = Link(
         id: replaceId,
         url: url,
@@ -356,7 +435,9 @@ class _AddLinkScreenState extends ConsumerState<AddLinkScreen> {
         aiDescription: aiDescription,
         platform: platform,
         topic: topic,
+        contentType: contentType,
         tags: tags,
+        customCategoryId: _selectedCustomCategory?.id,
         createdAt: DateTime.now(),
       );
 
@@ -371,6 +452,11 @@ class _AddLinkScreenState extends ConsumerState<AddLinkScreen> {
         ref.invalidate(linksProvider(platform));
         ref.invalidate(allLinksProvider);
         ref.invalidate(allTagsProvider);
+        if (_selectedCustomCategory?.id != null) {
+          ref.invalidate(
+            linksByCustomCategoryProvider(_selectedCustomCategory!.id!),
+          );
+        }
         context.pop();
       }
     } catch (e) {
@@ -411,39 +497,55 @@ class _AddLinkScreenState extends ConsumerState<AddLinkScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    final backgroundColor = theme.scaffoldBackgroundColor;
+    final borderColor = isDark
+        ? NotionTheme.darkDivider
+        : NotionTheme.dividerColor;
+    final textColor = isDark ? NotionTheme.darkTextPrimary : NotionTheme.primaryBlack;
+    final subtextColor = isDark ? NotionTheme.darkTextSecondary : NotionTheme.textGray;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Add Link')),
+      backgroundColor: backgroundColor,
+      appBar: AppBar(
+        backgroundColor: backgroundColor,
+        elevation: 0,
+        title: Text('Add Link', style: theme.textTheme.titleMedium),
+        iconTheme: IconThemeData(color: textColor),
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('URL', style: Theme.of(context).textTheme.labelSmall),
+            Text(
+              'URL',
+              style: theme.textTheme.labelSmall?.copyWith(color: subtextColor),
+            ),
             const SizedBox(height: 8),
             Container(
               decoration: BoxDecoration(
-                color: NotionTheme.backgroundOffWhite,
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(color: NotionTheme.dividerColor),
+                color: isDark
+                    ? NotionTheme.darkSurface
+                    : NotionTheme.backgroundOffWhite,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: borderColor),
               ),
               child: TextField(
                 controller: _urlController,
-                style: Theme.of(context).textTheme.bodyLarge,
+                style: theme.textTheme.bodyLarge,
                 decoration: InputDecoration(
                   hintText: 'https://example.com',
-                  hintStyle: TextStyle(
-                    color: NotionTheme.textGray.withOpacity(0.5),
-                  ),
+                  hintStyle: TextStyle(color: subtextColor.withOpacity(0.5)),
                   border: InputBorder.none,
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 16,
                     vertical: 12,
                   ),
                   errorText: _error,
-                  prefixIcon: const Icon(
-                    Icons.link,
-                    color: NotionTheme.textGray,
-                  ),
+                  prefixIcon: Icon(Icons.link, color: subtextColor),
                 ),
                 keyboardType: TextInputType.url,
                 autofocus: true,
@@ -464,23 +566,18 @@ class _AddLinkScreenState extends ConsumerState<AddLinkScreen> {
                   children: [
                     Icon(
                       _showAdvanced ? Icons.expand_less : Icons.expand_more,
-                      color: NotionTheme.textGray,
+                      color: subtextColor,
                       size: 20,
                     ),
                     const SizedBox(width: 4),
                     Text(
                       'Advanced Options',
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: NotionTheme.textGray,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: subtextColor,
                       ),
                     ),
                     const SizedBox(width: 8),
-                    Expanded(
-                      child: Container(
-                        height: 1,
-                        color: NotionTheme.dividerColor,
-                      ),
-                    ),
+                    Expanded(child: Container(height: 1, color: borderColor)),
                   ],
                 ),
               ),
@@ -493,32 +590,31 @@ class _AddLinkScreenState extends ConsumerState<AddLinkScreen> {
               // Manual Title
               Text(
                 'Title (optional)',
-                style: Theme.of(context).textTheme.labelSmall,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: subtextColor,
+                ),
               ),
               const SizedBox(height: 8),
               Container(
                 decoration: BoxDecoration(
-                  color: NotionTheme.backgroundOffWhite,
-                  borderRadius: BorderRadius.circular(4),
-                  border: Border.all(color: NotionTheme.dividerColor),
+                  color: isDark
+                      ? NotionTheme.darkSurface
+                      : NotionTheme.backgroundOffWhite,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: borderColor),
                 ),
                 child: TextField(
                   controller: _titleController,
-                  style: Theme.of(context).textTheme.bodyLarge,
+                  style: theme.textTheme.bodyLarge,
                   decoration: InputDecoration(
                     hintText: 'Leave empty for auto-detection',
-                    hintStyle: TextStyle(
-                      color: NotionTheme.textGray.withOpacity(0.5),
-                    ),
+                    hintStyle: TextStyle(color: subtextColor.withOpacity(0.5)),
                     border: InputBorder.none,
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 16,
                       vertical: 12,
                     ),
-                    prefixIcon: const Icon(
-                      Icons.title,
-                      color: NotionTheme.textGray,
-                    ),
+                    prefixIcon: Icon(Icons.title, color: subtextColor),
                   ),
                 ),
               ),
@@ -527,35 +623,34 @@ class _AddLinkScreenState extends ConsumerState<AddLinkScreen> {
               // Manual Description
               Text(
                 'Description (optional)',
-                style: Theme.of(context).textTheme.labelSmall,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: subtextColor,
+                ),
               ),
               const SizedBox(height: 8),
               Container(
                 decoration: BoxDecoration(
-                  color: NotionTheme.backgroundOffWhite,
-                  borderRadius: BorderRadius.circular(4),
-                  border: Border.all(color: NotionTheme.dividerColor),
+                  color: isDark
+                      ? NotionTheme.darkSurface
+                      : NotionTheme.backgroundOffWhite,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: borderColor),
                 ),
                 child: TextField(
                   controller: _descriptionController,
-                  style: Theme.of(context).textTheme.bodyLarge,
+                  style: theme.textTheme.bodyLarge,
                   maxLines: 3,
                   decoration: InputDecoration(
                     hintText: 'Leave empty for auto-detection',
-                    hintStyle: TextStyle(
-                      color: NotionTheme.textGray.withOpacity(0.5),
-                    ),
+                    hintStyle: TextStyle(color: subtextColor.withOpacity(0.5)),
                     border: InputBorder.none,
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 16,
                       vertical: 12,
                     ),
-                    prefixIcon: const Padding(
-                      padding: EdgeInsets.only(bottom: 40),
-                      child: Icon(
-                        Icons.description,
-                        color: NotionTheme.textGray,
-                      ),
+                    prefixIcon: Padding(
+                      padding: const EdgeInsets.only(bottom: 40),
+                      child: Icon(Icons.description, color: subtextColor),
                     ),
                   ),
                 ),
@@ -565,7 +660,9 @@ class _AddLinkScreenState extends ConsumerState<AddLinkScreen> {
               // Tags section
               Text(
                 'Tags (optional)',
-                style: Theme.of(context).textTheme.labelSmall,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: subtextColor,
+                ),
               ),
               const SizedBox(height: 8),
               GestureDetector(
@@ -573,24 +670,22 @@ class _AddLinkScreenState extends ConsumerState<AddLinkScreen> {
                 child: Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: NotionTheme.backgroundOffWhite,
-                    borderRadius: BorderRadius.circular(4),
-                    border: Border.all(color: NotionTheme.dividerColor),
+                    color: isDark
+                        ? NotionTheme.darkSurface
+                        : NotionTheme.backgroundOffWhite,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: borderColor),
                   ),
                   child: Row(
                     children: [
-                      const Icon(
-                        Icons.tag,
-                        color: NotionTheme.textGray,
-                        size: 20,
-                      ),
+                      Icon(Icons.tag, color: subtextColor, size: 20),
                       const SizedBox(width: 8),
                       Expanded(
                         child: _selectedTags.isEmpty
                             ? Text(
                                 'Tap to add tags',
                                 style: TextStyle(
-                                  color: NotionTheme.textGray.withOpacity(0.5),
+                                  color: subtextColor.withOpacity(0.5),
                                 ),
                               )
                             : Wrap(
@@ -603,7 +698,12 @@ class _AddLinkScreenState extends ConsumerState<AddLinkScreen> {
                                       vertical: 4,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: NotionTheme.primaryBlack.withOpacity(0.1),
+                                      color:
+                                          (isDark
+                                                  ? NotionTheme
+                                                        .darkAccentPrimary
+                                                  : NotionTheme.primaryBlack)
+                                              .withOpacity(0.2),
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                     child: Row(
@@ -611,18 +711,19 @@ class _AddLinkScreenState extends ConsumerState<AddLinkScreen> {
                                       children: [
                                         Text(
                                           '#$tag',
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             fontSize: 12,
                                             fontWeight: FontWeight.w500,
+                                            color: textColor,
                                           ),
                                         ),
                                         const SizedBox(width: 4),
                                         GestureDetector(
                                           onTap: () => _removeTag(tag),
-                                          child: const Icon(
+                                          child: Icon(
                                             Icons.close,
                                             size: 14,
-                                            color: NotionTheme.textGray,
+                                            color: subtextColor,
                                           ),
                                         ),
                                       ],
@@ -631,10 +732,7 @@ class _AddLinkScreenState extends ConsumerState<AddLinkScreen> {
                                 }).toList(),
                               ),
                       ),
-                      const Icon(
-                        Icons.arrow_drop_down,
-                        color: NotionTheme.textGray,
-                      ),
+                      Icon(Icons.arrow_drop_down, color: subtextColor),
                     ],
                   ),
                 ),
@@ -645,13 +743,13 @@ class _AddLinkScreenState extends ConsumerState<AddLinkScreen> {
             // Manual Topic Selection
             Text(
               'Topic (optional)',
-              style: Theme.of(context).textTheme.labelSmall,
+              style: theme.textTheme.labelSmall?.copyWith(color: subtextColor),
             ),
             const SizedBox(height: 8),
             Text(
               'Leave empty for AI auto-detection',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: NotionTheme.textGray,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: subtextColor,
                 fontStyle: FontStyle.italic,
               ),
             ),
@@ -675,7 +773,7 @@ class _AddLinkScreenState extends ConsumerState<AddLinkScreen> {
                       _manualTopic = selected ? topic : null;
                     });
                   },
-                  backgroundColor: color.withOpacity(0.1),
+                  backgroundColor: color.withOpacity(isDark ? 0.2 : 0.1),
                   selectedColor: color,
                   labelStyle: TextStyle(
                     color: isSelected ? Colors.white : color,
@@ -693,17 +791,109 @@ class _AddLinkScreenState extends ConsumerState<AddLinkScreen> {
                 );
               }).toList(),
             ),
+
+            const SizedBox(height: 24),
+
+            // Custom Category Selection
+            Text(
+              'Custom Category (optional)',
+              style: theme.textTheme.labelSmall?.copyWith(color: subtextColor),
+            ),
+            const SizedBox(height: 8),
+            Consumer(
+              builder: (context, ref, child) {
+                final categoriesAsync = ref.watch(customCategoriesProvider);
+
+                return categoriesAsync.when(
+                  data: (categories) {
+                    if (categories.isEmpty) {
+                      return Text(
+                        'No custom categories created yet',
+                        style: TextStyle(
+                          color: subtextColor.withOpacity(0.5),
+                          fontSize: 12,
+                        ),
+                      );
+                    }
+
+                    return Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: categories.map((category) {
+                        final isSelected =
+                            _selectedCustomCategory?.id == category.id;
+                        final categoryColor = Color(category.colorValue);
+
+                        return FilterChip(
+                          avatar: category.iconName != null
+                              ? Icon(
+                                  IconData(
+                                    int.parse(category.iconName!),
+                                    fontFamily: 'MaterialIcons',
+                                  ),
+                                  size: 16,
+                                  color: isSelected
+                                      ? Colors.white
+                                      : categoryColor,
+                                )
+                              : null,
+                          label: Text(category.name),
+                          selected: isSelected,
+                          onSelected: (selected) {
+                            setState(() {
+                              _selectedCustomCategory = selected
+                                  ? category
+                                  : null;
+                            });
+                          },
+                          backgroundColor: categoryColor.withOpacity(
+                            isDark ? 0.2 : 0.1,
+                          ),
+                          selectedColor: categoryColor,
+                          labelStyle: TextStyle(
+                            color: isSelected ? Colors.white : categoryColor,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            side: BorderSide(
+                              color: isSelected
+                                  ? categoryColor
+                                  : categoryColor.withOpacity(0.3),
+                            ),
+                          ),
+                          showCheckmark: false,
+                          visualDensity: VisualDensity.compact,
+                        );
+                      }).toList(),
+                    );
+                  },
+                  loading: () => const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  error: (_, __) => Text(
+                    'Error loading categories',
+                    style: TextStyle(color: Colors.red[300], fontSize: 12),
+                  ),
+                );
+              },
+            ),
+
             const SizedBox(height: 24),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: _isLoading ? null : _checkForDuplicateAndSave,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: NotionTheme.primaryBlack,
+                  backgroundColor:
+                      theme.floatingActionButtonTheme.backgroundColor,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(4),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   elevation: 0,
                 ),
@@ -778,9 +968,11 @@ class _TagSelectorSheetState extends State<_TagSelectorSheet> {
             .toList();
       } else {
         _filteredTags = widget.availableTags
-            .where((tag) =>
-                !widget.selectedTags.contains(tag) &&
-                tag.toLowerCase().contains(query.toLowerCase()))
+            .where(
+              (tag) =>
+                  !widget.selectedTags.contains(tag) &&
+                  tag.toLowerCase().contains(query.toLowerCase()),
+            )
             .toList();
       }
     });
@@ -789,6 +981,8 @@ class _TagSelectorSheetState extends State<_TagSelectorSheet> {
   @override
   Widget build(BuildContext context) {
     final bottomPadding = MediaQuery.of(context).viewInsets.bottom;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return Container(
       padding: EdgeInsets.only(bottom: bottomPadding),
@@ -805,23 +999,20 @@ class _TagSelectorSheetState extends State<_TagSelectorSheet> {
               children: [
                 const Icon(Icons.tag, size: 20),
                 const SizedBox(width: 8),
-                Text(
-                  'Select or Add Tag',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
+                Text('Select or Add Tag', style: theme.textTheme.titleMedium),
               ],
             ),
           ),
-          const Divider(color: NotionTheme.dividerColor, height: 1),
+          const Divider(height: 1),
 
           // Search bar
           Padding(
             padding: const EdgeInsets.all(16),
             child: Container(
               decoration: BoxDecoration(
-                color: NotionTheme.backgroundOffWhite,
+                color: isDark
+                    ? NotionTheme.darkSurface
+                    : NotionTheme.backgroundOffWhite,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: NotionTheme.dividerColor),
               ),
@@ -854,17 +1045,21 @@ class _TagSelectorSheetState extends State<_TagSelectorSheet> {
 
           // Create new tag option
           if (_searchController.text.isNotEmpty &&
-              !_filteredTags.contains(_searchController.text.trim().toLowerCase()))
+              !_filteredTags.contains(
+                _searchController.text.trim().toLowerCase(),
+              ))
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: ListTile(
-                leading: const Icon(Icons.add, color: NotionTheme.primaryBlack),
+                leading: Icon(Icons.add, color: theme.colorScheme.onSurface),
                 title: Text(
                   'Create "${_searchController.text.trim()}"',
                   style: const TextStyle(fontWeight: FontWeight.w500),
                 ),
                 onTap: () => widget.onNewTag(_searchController.text.trim()),
-                tileColor: NotionTheme.backgroundOffWhite,
+                tileColor: isDark
+                    ? NotionTheme.darkSurface
+                    : NotionTheme.backgroundOffWhite,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -888,14 +1083,14 @@ class _TagSelectorSheetState extends State<_TagSelectorSheet> {
                           const SizedBox(height: 12),
                           Text(
                             'No tags yet',
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            style: theme.textTheme.bodyMedium?.copyWith(
                               color: NotionTheme.textGray,
                             ),
                           ),
                           const SizedBox(height: 4),
                           Text(
                             'Type to create a new tag',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            style: theme.textTheme.bodySmall?.copyWith(
                               color: NotionTheme.textGray,
                             ),
                           ),
