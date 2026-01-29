@@ -5,12 +5,12 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:intl/intl.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../domain/entities/link.dart';
 import '../../domain/entities/platform_type.dart';
 import '../../domain/entities/topic_type.dart';
 import '../../data/services/translation_service.dart';
 import '../providers/link_providers.dart';
-import '../providers/theme_provider.dart';
 import '../theme/notion_theme.dart';
 
 final _translationServiceProvider = Provider<TranslationService>((ref) {
@@ -28,8 +28,9 @@ class LinkDetailScreen extends ConsumerStatefulWidget {
 
 class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
   String? _translatedSummary;
-  String? _translatedDescription;
   bool _isTranslating = false;
+  bool _isGeneratingAiSummary = false;
+  bool _isRefreshingMetadata = false;
   String _selectedLanguage = 'Arabic';
   late TopicType _currentTopic;
   late Link _currentLink;
@@ -65,7 +66,7 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
     }
   }
 
-  Future<void> _translateContent() async {
+  Future<void> _translateSummary() async {
     final translationService = ref.read(_translationServiceProvider);
 
     if (!translationService.isAvailable) {
@@ -80,14 +81,15 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
       return;
     }
 
+    if (_currentLink.aiDescription == null) return;
+
     setState(() {
       _isTranslating = true;
     });
 
-    // Translate AI summary if available
-    if (widget.link.aiDescription != null) {
+    try {
       final translated = await translationService.translate(
-        text: widget.link.aiDescription!,
+        text: _currentLink.aiDescription!,
         targetLanguage: _selectedLanguage,
       );
       if (mounted) {
@@ -95,33 +97,160 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
           _translatedSummary = translated;
         });
       }
-    }
-
-    // Translate description if available
-    if (widget.link.description != null) {
-      final translated = await translationService.translate(
-        text: widget.link.description!,
-        targetLanguage: _selectedLanguage,
-      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Translation failed: $e'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
       if (mounted) {
         setState(() {
-          _translatedDescription = translated;
+          _isTranslating = false;
         });
       }
-    }
-
-    if (mounted) {
-      setState(() {
-        _isTranslating = false;
-      });
     }
   }
 
   void _clearTranslation() {
     setState(() {
       _translatedSummary = null;
-      _translatedDescription = null;
     });
+  }
+
+  Future<void> _generateAiSummary() async {
+    final aiService = ref.read(aiDescriptionServiceProvider);
+    final updateLink = ref.read(updateLinkProvider);
+
+    setState(() {
+      _isGeneratingAiSummary = true;
+    });
+
+    try {
+      final aiDescription = await aiService.generateDescription(
+        url: _currentLink.url,
+        title: _currentLink.title,
+        existingDescription: _currentLink.description,
+      );
+
+      if (aiDescription != null && mounted) {
+        final updatedLink = _currentLink.copyWith(aiDescription: aiDescription);
+        await updateLink(updatedLink);
+
+        setState(() {
+          _currentLink = updatedLink;
+        });
+
+        // Invalidate providers to refresh data
+        ref.invalidate(allLinksProvider);
+        ref.invalidate(linksProvider);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('AI Summary generated successfully'),
+            behavior: SnackBarBehavior.floating,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      } else if (mounted) {
+        final errorMsg = aiService.lastError ?? 'Failed to generate AI Summary';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMsg),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isGeneratingAiSummary = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _refreshMetadata() async {
+    if (_isRefreshingMetadata) return;
+
+    setState(() {
+      _isRefreshingMetadata = true;
+    });
+
+    try {
+      final metadataService = ref.read(metadataServiceProvider);
+      final updateLink = ref.read(updateLinkProvider);
+
+      // Fetch fresh metadata from the URL
+      final metadata = await metadataService.fetchMetadata(_currentLink.url);
+
+      if (mounted) {
+        final updatedLink = _currentLink.copyWith(
+          title: metadata['title'] ?? _currentLink.title,
+          description: metadata['description'] ?? _currentLink.description,
+          imageUrl: metadata['image'],
+          publisherName: metadata['publisher'] ?? _currentLink.publisherName,
+        );
+
+        await updateLink(updatedLink);
+
+        // Clear the cached image so it fetches fresh
+        if (metadata['image'] != null) {
+          await CachedNetworkImage.evictFromCache(metadata['image']!);
+        }
+        if (_currentLink.imageUrl != null) {
+          await CachedNetworkImage.evictFromCache(_currentLink.imageUrl!);
+        }
+
+        setState(() {
+          _currentLink = updatedLink;
+        });
+
+        // Invalidate providers to refresh data
+        ref.invalidate(allLinksProvider);
+        ref.invalidate(linksProvider);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              metadata['image'] != null
+                  ? 'Metadata refreshed successfully'
+                  : 'Refreshed, but no image found',
+            ),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to refresh: $e'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isRefreshingMetadata = false;
+        });
+      }
+    }
   }
 
   Future<void> _showTopicSelector() async {
@@ -300,6 +429,20 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
         iconTheme: IconThemeData(color: textColor),
         actions: [
           IconButton(
+            icon: _isRefreshingMetadata
+                ? SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: textColor,
+                    ),
+                  )
+                : Icon(Icons.refresh, color: textColor),
+            onPressed: _isRefreshingMetadata ? null : _refreshMetadata,
+            tooltip: 'Refresh metadata',
+          ),
+          IconButton(
             icon: Icon(Icons.share, color: textColor),
             onPressed: () async {
               try {
@@ -324,15 +467,62 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
           children: [
             // Hero Image
             if (link.imageUrl != null)
-              Container(
+              SizedBox(
                 width: double.infinity,
                 height: 200,
-                decoration: BoxDecoration(
-                  color: sidebarColor,
-                  image: DecorationImage(
-                    image: NetworkImage(link.imageUrl!),
-                    fit: BoxFit.cover,
-                    onError: (_, __) {},
+                child: CachedNetworkImage(
+                  imageUrl: link.imageUrl!,
+                  fit: BoxFit.cover,
+                  placeholder: (context, url) => Container(
+                    color: sidebarColor,
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                  errorWidget: (context, url, error) => Container(
+                    color: sidebarColor,
+                    child: _isRefreshingMetadata
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                CircularProgressIndicator(
+                                  color: theme.colorScheme.primary,
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Refreshing...',
+                                  style: TextStyle(color: subtextColor, fontSize: 12),
+                                ),
+                              ],
+                            ),
+                          )
+                        : Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.broken_image_outlined,
+                                size: 48,
+                                color: subtextColor,
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Image unavailable',
+                                style: TextStyle(color: subtextColor, fontSize: 12),
+                              ),
+                              const SizedBox(height: 8),
+                              TextButton.icon(
+                                onPressed: _refreshMetadata,
+                                icon: const Icon(Icons.refresh, size: 16),
+                                label: const Text('Refresh'),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: theme.colorScheme.primary,
+                                ),
+                              ),
+                            ],
+                          ),
                   ),
                 ),
               )
@@ -422,15 +612,15 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
                   const SizedBox(height: 16),
 
                   // AI Summary Section
+                  _buildSectionHeader(
+                    context,
+                    icon: Icons.auto_awesome,
+                    title: 'AI Summary',
+                    iconColor: theme.colorScheme.primary,
+                    textColor: subtextColor,
+                  ),
+                  const SizedBox(height: 8),
                   if (link.aiDescription != null) ...[
-                    _buildSectionHeader(
-                      context,
-                      icon: Icons.auto_awesome,
-                      title: 'AI Summary',
-                      iconColor: theme.colorScheme.primary,
-                      textColor: subtextColor,
-                    ),
-                    const SizedBox(height: 8),
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
@@ -448,48 +638,8 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 16),
-                  ],
-
-                  // Description Section
-                  if (link.description != null) ...[
-                    _buildSectionHeader(
-                      context,
-                      icon: Icons.description_outlined,
-                      title: 'Description',
-                      textColor: subtextColor,
-                    ),
-                    const SizedBox(height: 8),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: sidebarColor,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: borderColor),
-                      ),
-                      child: Text(
-                        _translatedDescription ?? link.description!,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          height: 1.6,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-
-                  // Translation Section
-                  if (link.aiDescription != null ||
-                      link.description != null) ...[
-                    Divider(color: borderColor),
-                    const SizedBox(height: 16),
-                    _buildSectionHeader(
-                      context,
-                      icon: Icons.translate,
-                      title: 'Translate',
-                      textColor: subtextColor,
-                    ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 12),
+                    // Translation controls for AI Summary
                     Row(
                       children: [
                         Expanded(
@@ -534,7 +684,7 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
                         ),
                         const SizedBox(width: 8),
                         ElevatedButton.icon(
-                          onPressed: _isTranslating ? null : _translateContent,
+                          onPressed: _isTranslating ? null : _translateSummary,
                           icon: _isTranslating
                               ? const SizedBox(
                                   width: 16,
@@ -549,7 +699,7 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
                             _isTranslating ? 'Translating...' : 'Translate',
                           ),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: theme.primaryColor,
+                            backgroundColor: theme.colorScheme.primary,
                             foregroundColor: theme.colorScheme.onPrimary,
                             padding: const EdgeInsets.symmetric(
                               horizontal: 16,
@@ -563,8 +713,7 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
                         ),
                       ],
                     ),
-                    if (_translatedSummary != null ||
-                        _translatedDescription != null) ...[
+                    if (_translatedSummary != null) ...[
                       const SizedBox(height: 8),
                       TextButton.icon(
                         onPressed: _clearTranslation,
@@ -578,6 +727,81 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
                         ),
                       ),
                     ],
+                  ] else
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: sidebarColor,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: borderColor),
+                      ),
+                      child: Column(
+                        children: [
+                          Text(
+                            'No AI summary available',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: subtextColor,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          ElevatedButton.icon(
+                            onPressed: _isGeneratingAiSummary ? null : _generateAiSummary,
+                            icon: _isGeneratingAiSummary
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Icon(Icons.auto_awesome, size: 18),
+                            label: Text(
+                              _isGeneratingAiSummary ? 'Generating...' : 'Generate AI Summary',
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: theme.colorScheme.primary,
+                              foregroundColor: theme.colorScheme.onPrimary,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 10,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              elevation: 0,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  const SizedBox(height: 16),
+
+                  // Description Section
+                  if (link.description != null) ...[
+                    _buildSectionHeader(
+                      context,
+                      icon: Icons.description_outlined,
+                      title: 'Description',
+                      textColor: subtextColor,
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: sidebarColor,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: borderColor),
+                      ),
+                      child: Text(
+                        link.description!,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          height: 1.6,
+                        ),
+                      ),
+                    ),
                     const SizedBox(height: 16),
                   ],
 

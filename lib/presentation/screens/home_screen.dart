@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../domain/entities/platform_type.dart';
 import '../../domain/entities/link.dart';
 import '../../domain/entities/custom_category.dart';
@@ -1039,36 +1040,45 @@ class _SearchResultCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Thumbnail
-            if (link.imageUrl != null)
-              ClipRRect(
+            Container(
+              width: 50,
+              height: 50,
+              margin: const EdgeInsets.only(right: 12),
+              child: ClipRRect(
                 borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  width: 50,
-                  height: 50,
-                  margin: const EdgeInsets.only(right: 12),
-                  decoration: BoxDecoration(
-                    image: DecorationImage(
-                      image: NetworkImage(link.imageUrl!),
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                ),
-              )
-            else
-              Container(
-                width: 50,
-                height: 50,
-                margin: const EdgeInsets.only(right: 12),
-                decoration: BoxDecoration(
-                  color: isDarkMode ? Colors.white12 : Colors.grey[100],
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  Icons.link,
-                  color: theme.textTheme.bodySmall?.color,
-                  size: 20,
-                ),
+                child: link.imageUrl != null
+                    ? CachedNetworkImage(
+                        imageUrl: link.imageUrl!,
+                        fit: BoxFit.cover,
+                        placeholder: (context, url) => Container(
+                          color: isDarkMode ? Colors.white12 : Colors.grey[100],
+                          child: const Center(
+                            child: SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          ),
+                        ),
+                        errorWidget: (context, url, error) => Container(
+                          color: isDarkMode ? Colors.white12 : Colors.grey[100],
+                          child: Icon(
+                            Icons.broken_image_outlined,
+                            color: theme.textTheme.bodySmall?.color,
+                            size: 20,
+                          ),
+                        ),
+                      )
+                    : Container(
+                        color: isDarkMode ? Colors.white12 : Colors.grey[100],
+                        child: Icon(
+                          Icons.link,
+                          color: theme.textTheme.bodySmall?.color,
+                          size: 20,
+                        ),
+                      ),
               ),
+            ),
 
             // Content
             Expanded(

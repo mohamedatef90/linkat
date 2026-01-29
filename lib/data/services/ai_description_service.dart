@@ -3,13 +3,24 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class AiDescriptionService {
   GenerativeModel? _model;
+  String? _lastError;
 
   AiDescriptionService() {
+    _initModel();
+  }
+
+  void _initModel() {
     final apiKey = dotenv.env['GEMINI_API_KEY'];
     if (apiKey != null && apiKey.isNotEmpty) {
-      _model = GenerativeModel(model: 'gemini-1.5-flash', apiKey: apiKey);
+      _model = GenerativeModel(model: 'gemini-2.5-flash', apiKey: apiKey);
     }
   }
+
+  /// Check if the service is available
+  bool get isAvailable => _model != null;
+
+  /// Get the last error message
+  String? get lastError => _lastError;
 
   /// Generate a concise description for a link based on its title and existing description
   Future<String?> generateDescription({
@@ -17,8 +28,16 @@ class AiDescriptionService {
     String? title,
     String? existingDescription,
   }) async {
+    _lastError = null;
+
+    // Try to reinitialize if model is null
+    if (_model == null) {
+      _initModel();
+    }
+
     // If AI service is not configured, return null
     if (_model == null) {
+      _lastError = 'API key not configured. Add GEMINI_API_KEY to .env file.';
       return null;
     }
 
@@ -35,12 +54,16 @@ class AiDescriptionService {
       final generatedText = response.text?.trim();
 
       // Return the generated description or null if empty
-      return (generatedText != null && generatedText.isNotEmpty)
-          ? generatedText
-          : null;
+      if (generatedText != null && generatedText.isNotEmpty) {
+        return generatedText;
+      } else {
+        _lastError = 'AI returned empty response';
+        return null;
+      }
     } catch (e) {
       // Log error and return null on failure
       print('AI description generation failed: $e');
+      _lastError = e.toString();
       return null;
     }
   }

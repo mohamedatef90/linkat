@@ -1,16 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../domain/entities/platform_type.dart';
 import '../../domain/entities/topic_type.dart';
 import '../../domain/entities/content_type.dart';
 import '../../domain/entities/link.dart';
 import '../providers/link_providers.dart';
-import '../providers/theme_provider.dart';
 import '../theme/notion_theme.dart';
 import 'link_detail_screen.dart';
 
@@ -31,11 +30,106 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
   bool _isAiSearching = false;
   List<Link>? _aiSearchResults;
   String? _aiSearchExplanation;
+  bool _isRefreshingAll = false;
+  int _refreshProgress = 0;
+  int _refreshTotal = 0;
 
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _refreshAllImages(List<Link> links, PlatformType platform) async {
+    if (_isRefreshingAll) return;
+
+    // Filter links that have images or might need refresh
+    final linksToRefresh = links.where((link) => link.imageUrl != null || link.imageUrl == null).toList();
+
+    if (linksToRefresh.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No links to refresh'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return;
+    }
+
+    setState(() {
+      _isRefreshingAll = true;
+      _refreshProgress = 0;
+      _refreshTotal = linksToRefresh.length;
+    });
+
+    final metadataService = ref.read(metadataServiceProvider);
+    final updateLink = ref.read(updateLinkProvider);
+    int successCount = 0;
+    int failCount = 0;
+
+    for (int i = 0; i < linksToRefresh.length; i++) {
+      final link = linksToRefresh[i];
+
+      try {
+        final metadata = await metadataService.fetchMetadata(link.url);
+
+        if (mounted) {
+          final updatedLink = link.copyWith(
+            title: metadata['title'] ?? link.title,
+            description: metadata['description'] ?? link.description,
+            imageUrl: metadata['image'],
+            publisherName: metadata['publisher'] ?? link.publisherName,
+          );
+
+          await updateLink(updatedLink);
+
+          // Clear old cached image
+          if (link.imageUrl != null) {
+            await CachedNetworkImage.evictFromCache(link.imageUrl!);
+          }
+          if (metadata['image'] != null && metadata['image'] != link.imageUrl) {
+            await CachedNetworkImage.evictFromCache(metadata['image']!);
+          }
+
+          successCount++;
+        }
+      } catch (e) {
+        failCount++;
+        debugPrint('Failed to refresh link ${link.url}: $e');
+      }
+
+      if (mounted) {
+        setState(() {
+          _refreshProgress = i + 1;
+        });
+      }
+    }
+
+    // Invalidate providers to refresh data
+    ref.invalidate(linksProvider(platform));
+    ref.invalidate(allLinksProvider);
+
+    if (mounted) {
+      setState(() {
+        _isRefreshingAll = false;
+        _refreshProgress = 0;
+        _refreshTotal = 0;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            failCount == 0
+                ? 'Refreshed $successCount links successfully'
+                : 'Refreshed $successCount links, $failCount failed',
+          ),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: failCount == 0 ? NotionTheme.accentGreen : NotionTheme.accentOrange,
+        ),
+      );
+    }
   }
 
   Future<void> _performAiSearch(List<Link> allLinks) async {
@@ -202,41 +296,74 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                   // Thumbnail with content type overlay
                   Stack(
                     children: [
-                      if (link.imageUrl != null)
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: Container(
-                            width: 72,
-                            height: 72,
-                            decoration: BoxDecoration(
-                              image: DecorationImage(
-                                image: NetworkImage(link.imageUrl!),
-                                fit: BoxFit.cover,
-                              ),
-                            ),
-                          ),
-                        )
-                      else
-                        Container(
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: SizedBox(
                           width: 72,
                           height: 72,
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: isDark
-                                  ? [NotionTheme.darkDivider, NotionTheme.darkSurface]
-                                  : [Colors.grey[200]!, Colors.grey[100]!],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Center(
-                            child: Text(
-                              contentType.emoji,
-                              style: const TextStyle(fontSize: 28),
-                            ),
-                          ),
+                          child: link.imageUrl != null
+                              ? CachedNetworkImage(
+                                  imageUrl: link.imageUrl!,
+                                  fit: BoxFit.cover,
+                                  placeholder: (context, url) => Container(
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: isDark
+                                            ? [NotionTheme.darkSurfaceElevated, NotionTheme.darkSurface]
+                                            : [Colors.grey[200]!, Colors.grey[100]!],
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                      ),
+                                    ),
+                                    child: Center(
+                                      child: SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: theme.colorScheme.primary,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  errorWidget: (context, url, error) => Container(
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: isDark
+                                            ? [NotionTheme.darkSurfaceElevated, NotionTheme.darkSurface]
+                                            : [Colors.grey[200]!, Colors.grey[100]!],
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                      ),
+                                    ),
+                                    child: Center(
+                                      child: Icon(
+                                        Icons.broken_image_outlined,
+                                        size: 24,
+                                        color: isDark ? NotionTheme.darkTextMuted : Colors.grey[400],
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              : Container(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: isDark
+                                          ? [NotionTheme.darkSurfaceElevated, NotionTheme.darkSurface]
+                                          : [Colors.grey[200]!, Colors.grey[100]!],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      contentType.emoji,
+                                      style: const TextStyle(fontSize: 28),
+                                    ),
+                                  ),
+                                ),
                         ),
+                      ),
                       // Content type badge overlay
                       Positioned(
                         bottom: 4,
@@ -625,10 +752,62 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
             ),
             const SizedBox(width: 8),
             Text(platform.displayName, style: theme.textTheme.titleMedium),
+            if (_isRefreshingAll) ...[
+              const SizedBox(width: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      width: 12,
+                      height: 12,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '$_refreshProgress/$_refreshTotal',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
         titleSpacing: 0,
         iconTheme: IconThemeData(color: textColor),
+        actions: [
+          linksAsync.when(
+            data: (links) => IconButton(
+              icon: _isRefreshingAll
+                  ? SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: textColor,
+                      ),
+                    )
+                  : Icon(Icons.refresh_rounded, color: textColor),
+              onPressed: _isRefreshingAll ? null : () => _refreshAllImages(links, platform),
+              tooltip: 'Refresh all images',
+            ),
+            loading: () => const SizedBox.shrink(),
+            error: (_, __) => const SizedBox.shrink(),
+          ),
+        ],
       ),
       body: linksAsync.when(
         data: (links) => Column(
