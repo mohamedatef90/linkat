@@ -2,10 +2,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/repositories/link_repository_impl.dart';
 import '../../data/services/metadata_service.dart';
 import '../../data/services/platform_detection_service.dart';
-import '../../data/services/topic_classification_service.dart';
-import '../../data/services/ai_description_service.dart';
-import '../../data/services/ai_classification_service.dart';
-import '../../data/services/ai_search_service.dart';
 import '../../data/services/content_type_detection_service.dart';
 import '../../domain/entities/link.dart';
 import '../../domain/entities/platform_type.dart';
@@ -29,24 +25,6 @@ final platformDetectionServiceProvider = Provider<PlatformDetectionService>((
 final metadataServiceProvider = Provider<MetadataService>((ref) {
   return MetadataService();
 });
-
-final aiDescriptionServiceProvider = Provider<AiDescriptionService>((ref) {
-  return AiDescriptionService();
-});
-
-final aiClassificationServiceProvider = Provider<AiClassificationService>((ref) {
-  return AiClassificationService();
-});
-
-final aiSearchServiceProvider = Provider<AiSearchService>((ref) {
-  return AiSearchService();
-});
-
-final topicClassificationServiceProvider = Provider<TopicClassificationService>(
-  (ref) {
-    return TopicClassificationService();
-  },
-);
 
 final contentTypeDetectionServiceProvider = Provider<ContentTypeDetectionService>(
   (ref) {

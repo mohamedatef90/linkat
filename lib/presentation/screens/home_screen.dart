@@ -4,18 +4,21 @@ import 'package:go_router/go_router.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../data/datasources/remote/supabase_datasource.dart';
 import '../../domain/entities/platform_type.dart';
 import '../../domain/entities/link.dart';
-import '../../domain/entities/custom_category.dart';
 import '../../services/pending_links_service.dart';
+import '../providers/auth_providers.dart';
 import '../providers/link_providers.dart';
+import '../providers/sync_providers.dart';
 import '../theme/notion_theme.dart';
 import '../providers/theme_provider.dart';
+import '../widgets/status_chip.dart';
+import 'folder_items_screen.dart';
+import 'manage_folders_screen.dart';
 import 'tags_screen.dart';
 import 'topics_screen.dart';
 import 'link_detail_screen.dart';
-import 'manage_categories_screen.dart';
-import 'category_detail_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -29,7 +32,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   final TextEditingController _searchController = TextEditingController();
   bool _isSearching = false;
   List<Link>? _searchResults;
-  String? _searchExplanation;
   bool _isSearchLoading = false;
 
   @override
@@ -38,6 +40,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     WidgetsBinding.instance.addObserver(this);
     _listenForShareIntents();
     _checkPendingLinks();
+    // Kick off sync (pull + flush queued ops) and subscribe to Realtime.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(syncControllerProvider).start();
+    });
   }
 
   @override
@@ -49,183 +55,124 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Check for pending links when app comes to foreground
     if (state == AppLifecycleState.resumed) {
-      debugPrint('App resumed - checking for pending links');
       _checkPendingLinks();
+      ref.read(syncControllerProvider).syncNow();
     }
   }
 
-  /// Check for pending links saved from share extension
+  /// Links saved from the iOS share extension while the app was closed are
+  /// parked in shared UserDefaults; forward them to save-item.
   Future<void> _checkPendingLinks() async {
-    // Small delay to ensure app is fully loaded
     await Future.delayed(const Duration(milliseconds: 300));
-
-    debugPrint('HomeScreen: Starting pending links check...');
 
     try {
       final pendingLinks = await PendingLinksService.getPendingLinks();
+      if (pendingLinks.isEmpty) return;
 
-      debugPrint('HomeScreen: Got ${pendingLinks.length} pending links');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Saving shared link...'),
+            behavior: SnackBarBehavior.floating,
+            duration: Duration(seconds: 1),
+          ),
+        );
+      }
 
-      if (pendingLinks.isNotEmpty) {
-        // Show processing indicator
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Processing shared link...'),
-              behavior: SnackBarBehavior.floating,
-              duration: Duration(seconds: 1),
+      final controller = ref.read(syncControllerProvider);
+      for (final pending in pendingLinks) {
+        await controller.saveUrl(pending.url, fallbackTitle: pending.title);
+      }
+      await PendingLinksService.clearPendingLinks();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              pendingLinks.length == 1
+                  ? 'Link saved — processing in the background'
+                  : '${pendingLinks.length} links saved',
             ),
-          );
-        }
-
-        // Process each pending link
-        for (final pending in pendingLinks) {
-          debugPrint('HomeScreen: Processing link: ${pending.url}');
-          await _processPendingLink(pending);
-        }
-
-        // Clear pending links after processing
-        await PendingLinksService.clearPendingLinks();
-
-        // Refresh the links list
-        if (mounted) {
-          ref.invalidate(allLinksProvider);
-          ref.invalidate(linksProvider);
-
-          // Invalidate all platform providers
-          for (final platform in PlatformType.values) {
-            ref.invalidate(linksProvider(platform));
-          }
-
-          // Show success message
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                pendingLinks.length == 1
-                    ? 'Link saved successfully!'
-                    : '${pendingLinks.length} links saved successfully!',
-              ),
-              behavior: SnackBarBehavior.floating,
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
-      }
-    } catch (e, stackTrace) {
-      debugPrint('Error checking pending links: $e');
-      debugPrint('Stack trace: $stackTrace');
-    }
-  }
-
-  Future<void> _processPendingLink(PendingLink pending) async {
-    try {
-      final platformService = ref.read(platformDetectionServiceProvider);
-      final metadataService = ref.read(metadataServiceProvider);
-      final aiService = ref.read(aiDescriptionServiceProvider);
-      final aiClassificationService = ref.read(aiClassificationServiceProvider);
-      final topicService = ref.read(topicClassificationServiceProvider);
-      final saveLink = ref.read(saveLinkUseCaseProvider);
-
-      final platform = platformService.detectPlatform(pending.url);
-
-      // Fetch metadata from the URL
-      Map<String, String?> metadata = {
-        'title': null,
-        'description': null,
-        'image': null,
-        'publisher': null,
-      };
-
-      try {
-        final fetchedMetadata = await metadataService.fetchMetadata(
-          pending.url,
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Colors.green,
+          ),
         );
-        metadata = fetchedMetadata;
-      } catch (e) {
-        // Use fallback on error
       }
-
-      // Use fetched title, or pending title if available, or URL as last resort
-      if (metadata['title'] == null || metadata['title']!.isEmpty) {
-        if (pending.title.isNotEmpty) {
-          metadata['title'] = pending.title;
-        } else {
-          // Extract domain as fallback title
-          final uri = Uri.tryParse(pending.url);
-          metadata['title'] = uri?.host ?? pending.url;
-        }
-      }
-
-      // Classify topic
-      var topic = topicService.classifyContent(
-        title: metadata['title'] ?? pending.url,
-        description: metadata['description'],
-      );
-      List<String> tags = [];
-
-      // Use AI to classify and generate tags
-      try {
-        final aiClassification = await aiClassificationService.classifyContent(
-          url: pending.url,
-          title: metadata['title'],
-          description: metadata['description'],
-        );
-
-        if (aiClassification != null) {
-          topic = aiClassification.category;
-          tags = aiClassification.tags;
-        }
-      } catch (e) {
-        // Use keyword-based classification as fallback
-      }
-
-      // Generate AI description
-      String? aiDescription;
-      try {
-        aiDescription = await aiService.generateDescription(
-          url: pending.url,
-          title: metadata['title'],
-          existingDescription: metadata['description'],
-        );
-      } catch (e) {
-        // Skip AI description on error
-      }
-
-      // Detect content type from URL and metadata
-      final contentTypeService = ref.read(contentTypeDetectionServiceProvider);
-      final contentType = contentTypeService.detectContentType(
-        pending.url,
-        platform,
-        metadata['contentType'],
-      );
-
-      final link = Link(
-        url: pending.url,
-        title: metadata['title'] ?? pending.title,
-        description: metadata['description'],
-        imageUrl: metadata['image'],
-        publisherName: metadata['publisher'],
-        aiDescription: aiDescription,
-        platform: platform,
-        topic: topic,
-        contentType: contentType,
-        tags: tags,
-        createdAt: pending.createdAt,
-      );
-
-      await saveLink(link);
     } catch (e) {
-      debugPrint('Error processing pending link: $e');
+      debugPrint('Error handling pending links: $e');
     }
   }
 
-  Future<void> _performAiSearch(String query) async {
+  void _listenForShareIntents() {
+    ReceiveSharingIntent.instance.getMediaStream().listen(
+      (List<SharedMediaFile> value) {
+        if (value.isNotEmpty && value.first.path.isNotEmpty) {
+          _handleSharedContent(value.first.path);
+          ReceiveSharingIntent.instance.reset();
+        }
+      },
+      onError: (err) {
+        debugPrint('getIntentDataStream error: $err');
+      },
+    );
+
+    Future.delayed(const Duration(milliseconds: 500), () {
+      ReceiveSharingIntent.instance.getInitialMedia().then((
+        List<SharedMediaFile> value,
+      ) {
+        if (value.isNotEmpty && value.first.path.isNotEmpty) {
+          _handleSharedContent(value.first.path);
+          ReceiveSharingIntent.instance.reset();
+        }
+      });
+    });
+  }
+
+  /// Shared URLs save straight to save-item — no extra taps.
+  Future<void> _handleSharedContent(String sharedText) async {
+    final cleanedText = sharedText.trim();
+    String? urlToSave;
+
+    final uri = Uri.tryParse(cleanedText);
+    if (uri != null && (uri.scheme == 'http' || uri.scheme == 'https')) {
+      urlToSave = cleanedText;
+    } else {
+      final match = RegExp(r'https?://[^\s]+', caseSensitive: false)
+          .firstMatch(cleanedText);
+      urlToSave = match?.group(0);
+    }
+    if (urlToSave == null) return;
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Saving shared link...'),
+          behavior: SnackBarBehavior.floating,
+          duration: Duration(seconds: 1),
+        ),
+      );
+    }
+    try {
+      await ref.read(syncControllerProvider).saveUrl(urlToSave);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Link saved — processing in the background'),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error saving shared link: $e');
+    }
+  }
+
+  Future<void> _performSearch(String query) async {
     if (query.trim().isEmpty) {
       setState(() {
         _searchResults = null;
-        _searchExplanation = null;
         _isSearching = false;
       });
       return;
@@ -237,18 +184,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     });
 
     try {
-      final aiSearchService = ref.read(aiSearchServiceProvider);
-      final allLinks = await ref.read(allLinksProvider.future);
-
-      final result = await aiSearchService.smartSearch(
-        query: query,
-        allLinks: allLinks,
-      );
-
+      final repository = ref.read(linkRepositoryProvider);
+      final results = await repository.searchLinks(query.trim());
       if (mounted) {
         setState(() {
-          _searchResults = result.results;
-          _searchExplanation = result.explanation;
+          _searchResults = results;
           _isSearchLoading = false;
         });
       }
@@ -256,7 +196,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       if (mounted) {
         setState(() {
           _searchResults = [];
-          _searchExplanation = 'Search failed';
           _isSearchLoading = false;
         });
       }
@@ -267,84 +206,46 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     _searchController.clear();
     setState(() {
       _searchResults = null;
-      _searchExplanation = null;
       _isSearching = false;
     });
   }
 
-  void _listenForShareIntents() {
-    // Listen for shared content when app is already running
-    ReceiveSharingIntent.instance.getMediaStream().listen(
-      (List<SharedMediaFile> value) {
-        if (value.isNotEmpty && value.first.path.isNotEmpty) {
-          _handleSharedContent(value.first.path);
-          // Reset after handling
-          ReceiveSharingIntent.instance.reset();
-        }
-      },
-      onError: (err) {
-        debugPrint("getIntentDataStream error: $err");
-      },
+  Future<void> _signOut() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Sign out?'),
+        content:
+            const Text('Your saved links stay in your account in the cloud.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Sign Out'),
+          ),
+        ],
+      ),
     );
-
-    // Check for initial shared content (when app was opened via share)
-    // Use a small delay to ensure the widget is fully mounted
-    Future.delayed(const Duration(milliseconds: 500), () {
-      ReceiveSharingIntent.instance.getInitialMedia().then((
-        List<SharedMediaFile> value,
-      ) {
-        if (value.isNotEmpty && value.first.path.isNotEmpty) {
-          _handleSharedContent(value.first.path);
-          // Reset after handling
-          ReceiveSharingIntent.instance.reset();
-        }
-      });
-    });
-  }
-
-  void _handleSharedContent(String sharedText) {
-    // Clean up the shared text
-    final cleanedText = sharedText.trim();
-
-    // Try to extract URL from shared content
-    String? urlToSave;
-
-    // Check if the entire text is a URL
-    final uri = Uri.tryParse(cleanedText);
-    if (uri != null && (uri.scheme == 'http' || uri.scheme == 'https')) {
-      urlToSave = cleanedText;
-    } else {
-      // Try to find a URL within the text
-      final urlRegExp = RegExp(r'https?://[^\s]+', caseSensitive: false);
-      final match = urlRegExp.firstMatch(cleanedText);
-      if (match != null) {
-        urlToSave = match.group(0);
-      }
-    }
-
-    if (urlToSave != null && mounted) {
-      // Navigate to add screen with the URL
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          context.push('/add?url=${Uri.encodeComponent(urlToSave!)}');
-        }
-      });
-    }
+    if (confirmed != true) return;
+    await ref.read(supabaseClientProvider).auth.signOut();
+    if (mounted) context.go('/auth');
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    // Use actual theme brightness instead of just the provider state
     final isDarkMode = theme.brightness == Brightness.dark;
-    final textColor = isDarkMode ? NotionTheme.darkTextPrimary : NotionTheme.primaryBlack;
-    final subtextColor = isDarkMode ? NotionTheme.darkTextSecondary : NotionTheme.textGray;
-    final borderColor = isDarkMode
-        ? NotionTheme.darkDivider
-        : NotionTheme.dividerColor;
-    final itemBackgroundColor = isDarkMode
-        ? NotionTheme.darkSurface
-        : Colors.white;
+    final textColor =
+        isDarkMode ? NotionTheme.darkTextPrimary : NotionTheme.primaryBlack;
+    final subtextColor =
+        isDarkMode ? NotionTheme.darkTextSecondary : NotionTheme.textGray;
+    final borderColor =
+        isDarkMode ? NotionTheme.darkDivider : NotionTheme.dividerColor;
+    final itemBackgroundColor =
+        isDarkMode ? NotionTheme.darkSurface : Colors.white;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -368,343 +269,242 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             },
             tooltip: _getThemeTooltip(ref.watch(themeModeProvider)),
           ),
+          IconButton(
+            icon: Icon(Icons.logout, color: textColor),
+            onPressed: _signOut,
+            tooltip: 'Sign out',
+          ),
         ],
       ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Title Section
-              Row(
-                children: [
-                  Icon(Icons.dashboard_outlined, size: 28, color: textColor),
-                  const SizedBox(width: 12),
-                  Text('Dashboard', style: theme.textTheme.displayMedium),
-                ],
-              ),
-              const SizedBox(height: 24),
-
-              // Search Bar
-              Container(
-                decoration: BoxDecoration(
-                  color: itemBackgroundColor,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: borderColor),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, 2),
-                    ),
+      body: RefreshIndicator(
+        onRefresh: () => ref.read(syncControllerProvider).syncNow(),
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.dashboard_outlined, size: 28, color: textColor),
+                    const SizedBox(width: 12),
+                    Text('Dashboard', style: theme.textTheme.displayMedium),
                   ],
                 ),
-                child: TextField(
-                  controller: _searchController,
-                  style: TextStyle(color: textColor),
-                  decoration: InputDecoration(
-                    hintText: 'Search your links...',
-                    hintStyle: TextStyle(
-                      color: subtextColor.withOpacity(0.6),
-                      fontSize: 14,
+                const SizedBox(height: 24),
+
+                // Search Bar
+                Container(
+                  decoration: BoxDecoration(
+                    color: itemBackgroundColor,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: borderColor),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: TextField(
+                    controller: _searchController,
+                    style: TextStyle(color: textColor),
+                    decoration: InputDecoration(
+                      hintText: 'Search your links...',
+                      hintStyle: TextStyle(
+                        color: subtextColor.withOpacity(0.6),
+                        fontSize: 14,
+                      ),
+                      prefixIcon: _isSearchLoading
+                          ? Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: theme.primaryColor,
+                                ),
+                              ),
+                            )
+                          : Icon(Icons.search, color: subtextColor),
+                      suffixIcon: _isSearching
+                          ? IconButton(
+                              icon: Icon(
+                                Icons.close,
+                                size: 20,
+                                color: subtextColor,
+                              ),
+                              onPressed: _clearSearch,
+                            )
+                          : null,
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
                     ),
-                    prefixIcon: _isSearchLoading
-                        ? Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: theme.primaryColor,
+                    onSubmitted: _performSearch,
+                    textInputAction: TextInputAction.search,
+                  ),
+                ),
+
+                // Search Results
+                if (_isSearching) ...[
+                  const SizedBox(height: 12),
+                  if (_searchResults != null && _searchResults!.isEmpty)
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          children: [
+                            Icon(
+                              Icons.search_off,
+                              size: 48,
+                              color: subtextColor.withOpacity(0.5),
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              'No results found',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: subtextColor,
                               ),
                             ),
-                          )
-                        : Icon(Icons.search, color: subtextColor),
-                    suffixIcon: _isSearching
-                        ? IconButton(
-                            icon: Icon(
-                              Icons.close,
-                              size: 20,
-                              color: subtextColor,
-                            ),
-                            onPressed: _clearSearch,
-                          )
-                        : null,
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 14,
+                          ],
+                        ),
+                      ),
+                    )
+                  else if (_searchResults != null)
+                    ListView.separated(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: _searchResults!.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 8),
+                      itemBuilder: (context, index) {
+                        final link = _searchResults![index];
+                        return _SearchResultCard(
+                          link: link,
+                          isDarkMode: isDarkMode,
+                        );
+                      },
                     ),
-                  ),
-                  onSubmitted: _performAiSearch,
-                  textInputAction: TextInputAction.search,
-                ),
-              ),
+                  const SizedBox(height: 16),
+                  Divider(color: borderColor),
+                ],
 
-              // Search Results
-              if (_isSearching) ...[
-                const SizedBox(height: 16),
-                if (_searchExplanation != null)
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.primary.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: theme.colorScheme.primary.withOpacity(0.2),
+                const SizedBox(height: 24),
+
+                Text(
+                  'PLATFORMS',
+                  style:
+                      theme.textTheme.labelSmall?.copyWith(letterSpacing: 1.2),
+                ),
+                const SizedBox(height: 12),
+
+                Container(
+                  decoration: BoxDecoration(
+                    color: itemBackgroundColor,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: borderColor),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, 2),
                       ),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.auto_awesome,
-                          size: 16,
-                          color: theme.colorScheme.primary,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            _searchExplanation!,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.primary,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                    ],
                   ),
-                const SizedBox(height: 8),
-                if (_searchResults != null && _searchResults!.isEmpty)
-                  Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Column(
-                        children: [
-                          Icon(
-                            Icons.search_off,
-                            size: 48,
-                            color: subtextColor.withOpacity(0.5),
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            'No results found',
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: subtextColor,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
-                else if (_searchResults != null)
-                  ListView.separated(
+                  child: ListView.separated(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    itemCount: _searchResults!.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 8),
+                    itemCount: PlatformType.values.length,
+                    separatorBuilder: (context, index) =>
+                        Divider(height: 1, color: borderColor),
                     itemBuilder: (context, index) {
-                      final link = _searchResults![index];
-                      return _SearchResultCard(
-                        link: link,
-                        isDarkMode: isDarkMode,
+                      final platform = PlatformType.values[index];
+                      return _PlatformRow(
+                        platform: platform,
+                        textColor: textColor,
+                        subtextColor: subtextColor,
                       );
                     },
                   ),
-                const SizedBox(height: 16),
-                Divider(color: borderColor),
-              ],
-
-              const SizedBox(height: 24),
-
-              Text(
-                'PLATFORMS',
-                style: theme.textTheme.labelSmall?.copyWith(letterSpacing: 1.2),
-              ),
-              const SizedBox(height: 12),
-
-              // Platform List
-              Container(
-                decoration: BoxDecoration(
-                  color: itemBackgroundColor,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: borderColor),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
                 ),
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: PlatformType.values.length,
-                  separatorBuilder: (context, index) =>
-                      Divider(height: 1, color: borderColor),
-                  itemBuilder: (context, index) {
-                    final platform = PlatformType.values[index];
-                    return _PlatformRow(
-                      platform: platform,
-                      textColor: textColor,
-                      subtextColor: subtextColor,
-                    );
-                  },
+
+                const SizedBox(height: 32),
+
+                Text(
+                  'BROWSE',
+                  style:
+                      theme.textTheme.labelSmall?.copyWith(letterSpacing: 1.2),
                 ),
-              ),
+                const SizedBox(height: 12),
 
-              const SizedBox(height: 32),
-
-              Text(
-                'BROWSE',
-                style: theme.textTheme.labelSmall?.copyWith(letterSpacing: 1.2),
-              ),
-              const SizedBox(height: 12),
-
-              // Browse Section
-              Container(
-                decoration: BoxDecoration(
-                  color: itemBackgroundColor,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: borderColor),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    // Tags Row
-                    InkWell(
-                      onTap: () {
-                        Navigator.of(context).push(
+                Container(
+                  decoration: BoxDecoration(
+                    color: itemBackgroundColor,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: borderColor),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      _BrowseRow(
+                        icon: Icons.tag,
+                        label: 'Browse by Tags',
+                        textColor: textColor,
+                        subtextColor: subtextColor,
+                        onTap: () => Navigator.of(context).push(
                           MaterialPageRoute(
                             builder: (context) => const TagsScreen(),
                           ),
-                        );
-                      },
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 14,
-                          horizontal: 16,
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(Icons.tag, size: 20, color: subtextColor),
-                            const SizedBox(width: 12),
-                            Text(
-                              'Browse by Tags',
-                              style: theme.textTheme.bodyLarge?.copyWith(
-                                color: textColor,
-                              ),
-                            ),
-                            const Spacer(),
-                            Icon(
-                              Icons.chevron_right,
-                              size: 20,
-                              color: subtextColor,
-                            ),
-                          ],
                         ),
                       ),
-                    ),
-
-                    Divider(height: 1, color: borderColor),
-
-                    // Topics Row
-                    InkWell(
-                      onTap: () {
-                        Navigator.of(context).push(
+                      Divider(height: 1, color: borderColor),
+                      _BrowseRow(
+                        icon: Icons.category,
+                        label: 'Browse by Topics',
+                        textColor: textColor,
+                        subtextColor: subtextColor,
+                        onTap: () => Navigator.of(context).push(
                           MaterialPageRoute(
                             builder: (context) => const TopicsScreen(),
                           ),
-                        );
-                      },
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 14,
-                          horizontal: 16,
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(Icons.category, size: 20, color: subtextColor),
-                            const SizedBox(width: 12),
-                            Text(
-                              'Browse by Topics',
-                              style: theme.textTheme.bodyLarge?.copyWith(
-                                color: textColor,
-                              ),
-                            ),
-                            const Spacer(),
-                            Icon(
-                              Icons.chevron_right,
-                              size: 20,
-                              color: subtextColor,
-                            ),
-                          ],
                         ),
                       ),
-                    ),
-
-                    Divider(height: 1, color: borderColor),
-
-                    // Manage Categories Row
-                    InkWell(
-                      onTap: () {
-                        Navigator.of(context).push(
+                      Divider(height: 1, color: borderColor),
+                      _BrowseRow(
+                        icon: Icons.folder_outlined,
+                        label: 'Manage Folders',
+                        textColor: textColor,
+                        subtextColor: subtextColor,
+                        onTap: () => Navigator.of(context).push(
                           MaterialPageRoute(
-                            builder: (context) =>
-                                const ManageCategoriesScreen(),
+                            builder: (context) => const ManageFoldersScreen(),
                           ),
-                        );
-                      },
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 14,
-                          horizontal: 16,
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.settings_outlined,
-                              size: 20,
-                              color: subtextColor,
-                            ),
-                            const SizedBox(width: 12),
-                            Text(
-                              'Manage Categories',
-                              style: theme.textTheme.bodyLarge?.copyWith(
-                                color: textColor,
-                              ),
-                            ),
-                            const Spacer(),
-                            Icon(
-                              Icons.chevron_right,
-                              size: 20,
-                              color: subtextColor,
-                            ),
-                          ],
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
 
-              // Custom Categories Section
-              _buildCustomCategoriesSection(
-                theme,
-                textColor,
-                subtextColor,
-                itemBackgroundColor,
-                borderColor,
-              ),
-            ],
+                _buildFoldersSection(
+                  theme,
+                  textColor,
+                  subtextColor,
+                  itemBackgroundColor,
+                  borderColor,
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -717,7 +517,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     );
   }
 
-  Widget _buildCustomCategoriesSection(
+  Widget _buildFoldersSection(
     ThemeData theme,
     Color textColor,
     Color subtextColor,
@@ -726,13 +526,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   ) {
     return Consumer(
       builder: (context, ref, _) {
-        final categoriesAsync = ref.watch(customCategoriesProvider);
+        final foldersAsync = ref.watch(foldersProvider);
 
-        return categoriesAsync.when(
-          data: (categories) {
-            if (categories.isEmpty) {
-              return const SizedBox.shrink();
-            }
+        return foldersAsync.when(
+          data: (folders) {
+            if (folders.isEmpty) return const SizedBox.shrink();
 
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -741,7 +539,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 Row(
                   children: [
                     Text(
-                      'MY CATEGORIES',
+                      'FOLDERS',
                       style: theme.textTheme.labelSmall?.copyWith(
                         letterSpacing: 1.2,
                         color: subtextColor,
@@ -752,7 +550,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                       onTap: () {
                         Navigator.of(context).push(
                           MaterialPageRoute(
-                            builder: (context) => const ManageCategoriesScreen(),
+                            builder: (context) => const ManageFoldersScreen(),
                           ),
                         );
                       },
@@ -782,10 +580,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   ),
                   child: Column(
                     children: [
-                      for (int i = 0; i < categories.length; i++) ...[
+                      for (int i = 0; i < folders.length; i++) ...[
                         if (i > 0) Divider(height: 1, color: borderColor),
-                        _CategoryRow(
-                          category: categories[i],
+                        _FolderRow(
+                          folder: folders[i],
                           textColor: textColor,
                           subtextColor: subtextColor,
                         ),
@@ -823,6 +621,47 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       case ThemeMode.system:
         return 'Auto mode (tap for light)';
     }
+  }
+}
+
+class _BrowseRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color textColor;
+  final Color subtextColor;
+  final VoidCallback onTap;
+
+  const _BrowseRow({
+    required this.icon,
+    required this.label,
+    required this.textColor,
+    required this.subtextColor,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: subtextColor),
+            const SizedBox(width: 12),
+            Text(
+              label,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodyLarge
+                  ?.copyWith(color: textColor),
+            ),
+            const Spacer(),
+            Icon(Icons.chevron_right, size: 20, color: subtextColor),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -919,30 +758,26 @@ class _PlatformRow extends ConsumerWidget {
   }
 }
 
-class _CategoryRow extends ConsumerWidget {
-  final CustomCategory category;
+class _FolderRow extends ConsumerWidget {
+  final RemoteFolder folder;
   final Color textColor;
   final Color subtextColor;
 
-  const _CategoryRow({
-    required this.category,
+  const _FolderRow({
+    required this.folder,
     required this.textColor,
     required this.subtextColor,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final linksAsync = ref.watch(linksByCustomCategoryProvider(category.id!));
-    final categoryColor = Color(category.colorValue);
-    final categoryIcon = category.iconName != null
-        ? IconData(int.parse(category.iconName!), fontFamily: 'MaterialIcons')
-        : Icons.folder_outlined;
+    final linksAsync = ref.watch(linksByFolderProvider(folder.id));
 
     return InkWell(
       onTap: () {
         Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (context) => CategoryDetailScreen(category: category),
+            builder: (context) => FolderItemsScreen(folder: folder),
           ),
         );
       },
@@ -954,30 +789,35 @@ class _CategoryRow extends ConsumerWidget {
               width: 32,
               height: 32,
               decoration: BoxDecoration(
-                color: categoryColor.withOpacity(0.15),
+                color: Theme.of(context)
+                    .colorScheme
+                    .primary
+                    .withOpacity(0.12),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(
-                categoryIcon,
+                Icons.folder_outlined,
                 size: 18,
-                color: categoryColor,
+                color: Theme.of(context).colorScheme.primary,
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                category.name,
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: textColor,
-                ),
+                folder.name,
+                style: Theme.of(context)
+                    .textTheme
+                    .bodyLarge
+                    ?.copyWith(color: textColor),
               ),
             ),
             linksAsync.when(
               data: (links) => Text(
                 '${links.length}',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: subtextColor,
-                ),
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(color: subtextColor),
               ),
               loading: () => SizedBox(
                 width: 14,
@@ -1009,12 +849,10 @@ class _SearchResultCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final borderColor = isDarkMode
-        ? NotionTheme.darkDivider
-        : NotionTheme.dividerColor;
-    final itemBackgroundColor = isDarkMode
-        ? NotionTheme.darkSurface
-        : Colors.white;
+    final borderColor =
+        isDarkMode ? NotionTheme.darkDivider : NotionTheme.dividerColor;
+    final itemBackgroundColor =
+        isDarkMode ? NotionTheme.darkSurface : Colors.white;
 
     return GestureDetector(
       onTap: () {
@@ -1039,7 +877,6 @@ class _SearchResultCard extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Thumbnail
             Container(
               width: 50,
               height: 50,
@@ -1051,7 +888,8 @@ class _SearchResultCard extends StatelessWidget {
                         imageUrl: link.imageUrl!,
                         fit: BoxFit.cover,
                         placeholder: (context, url) => Container(
-                          color: isDarkMode ? Colors.white12 : Colors.grey[100],
+                          color:
+                              isDarkMode ? Colors.white12 : Colors.grey[100],
                           child: const Center(
                             child: SizedBox(
                               width: 16,
@@ -1061,7 +899,8 @@ class _SearchResultCard extends StatelessWidget {
                           ),
                         ),
                         errorWidget: (context, url, error) => Container(
-                          color: isDarkMode ? Colors.white12 : Colors.grey[100],
+                          color:
+                              isDarkMode ? Colors.white12 : Colors.grey[100],
                           child: Icon(
                             Icons.broken_image_outlined,
                             color: theme.textTheme.bodySmall?.color,
@@ -1079,8 +918,6 @@ class _SearchResultCard extends StatelessWidget {
                       ),
               ),
             ),
-
-            // Content
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1106,7 +943,7 @@ class _SearchResultCard extends StatelessWidget {
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
-                          link.topic.displayName,
+                          link.topicLabel ?? link.topic.displayName,
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.primary,
                             fontSize: 10,
@@ -1119,12 +956,13 @@ class _SearchResultCard extends StatelessWidget {
                         link.platform.displayName,
                         style: theme.textTheme.bodySmall,
                       ),
+                      const SizedBox(width: 8),
+                      StatusChip(link: link),
                     ],
                   ),
                 ],
               ),
             ),
-
             Icon(
               Icons.chevron_right,
               color: theme.textTheme.bodySmall?.color,
