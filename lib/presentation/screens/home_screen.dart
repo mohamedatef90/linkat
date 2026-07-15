@@ -723,7 +723,7 @@ class _PlatformRow extends ConsumerWidget {
     );
   }
 
-  IconData _getIcon(PlatformType platform) {
+  FaIconData _getIcon(PlatformType platform) {
     switch (platform) {
       case PlatformType.facebook:
         return FontAwesomeIcons.facebook;

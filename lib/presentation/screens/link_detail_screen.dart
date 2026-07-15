@@ -126,7 +126,7 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
     }
   }
 
-  IconData _getPlatformIcon(PlatformType platform) {
+  FaIconData _getPlatformIcon(PlatformType platform) {
     switch (platform) {
       case PlatformType.facebook:
         return FontAwesomeIcons.facebook;
