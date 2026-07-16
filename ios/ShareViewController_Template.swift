@@ -6,7 +6,7 @@ import WebKit
 class ShareViewController: SLComposeServiceViewController {
 
     // TODO: REPLACE THIS WITH YOUR ACTUAL APP GROUP ID
-    let hostAppBundleIdentifier = "group.com.example.linkat"
+    let hostAppBundleIdentifier = "group.com.linkat"
     let sharedKey = "ShareKey"
     
     var webView: WKWebView?

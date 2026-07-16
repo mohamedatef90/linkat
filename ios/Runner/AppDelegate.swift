@@ -3,7 +3,7 @@ import UIKit
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
-  private let appGroupId = "group.com.example.linkat"
+  private let appGroupId = "group.com.linkat"
   private let pendingLinksKey = "PendingLinks"
 
   override func application(
