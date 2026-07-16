@@ -5,6 +5,7 @@ import '../../domain/entities/link.dart';
 import '../providers/sync_providers.dart';
 import '../theme/notion_theme.dart';
 import '../widgets/status_chip.dart';
+import '../widgets/magic/magic.dart';
 
 /// Reading view for an enriched item: summary, key points, tags, and the
 /// full extracted text (fetched from the server when the screen opens).
@@ -36,9 +37,9 @@ class ReaderScreen extends ConsumerWidget {
         : const AsyncValue<String?>.data(null);
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: NotionTheme.ink,
       appBar: AppBar(
-        backgroundColor: theme.scaffoldBackgroundColor,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         title: Text('Reader', style: theme.textTheme.titleMedium),
         actions: [
@@ -49,7 +50,8 @@ class ReaderScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: SingleChildScrollView(
+      body: AuraBackground(
+        child: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -181,7 +183,7 @@ class ReaderScreen extends ConsumerWidget {
             const SizedBox(height: 32),
           ],
         ),
-      ),
+      )),
     );
   }
 

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../theme/notion_theme.dart';
+import '../widgets/magic/magic.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -104,8 +106,9 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF000000),
-      body: Center(
+      backgroundColor: NotionTheme.ink,
+      body: AuraBackground(
+        child: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -125,29 +128,19 @@ class _SplashScreenState extends State<SplashScreen>
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         boxShadow: [
-                          // Glow effect - Purple
                           BoxShadow(
-                            color: const Color(0xFF9333EA).withOpacity(
-                              0.4 * _glowAnimation.value,
+                            color: NotionTheme.lime.withValues(
+                              alpha: 0.4 * _glowAnimation.value,
                             ),
                             blurRadius: 50 * _glowAnimation.value,
                             spreadRadius: 15 * _glowAnimation.value,
                           ),
-                          // Glow effect - Blue
                           BoxShadow(
-                            color: const Color(0xFF3B82F6).withOpacity(
-                              0.3 * _glowAnimation.value,
+                            color: NotionTheme.green.withValues(
+                              alpha: 0.3 * _glowAnimation.value,
                             ),
-                            blurRadius: 70 * _glowAnimation.value,
-                            spreadRadius: 25 * _glowAnimation.value,
-                          ),
-                          // Glow effect - Pink
-                          BoxShadow(
-                            color: const Color(0xFFEC4899).withOpacity(
-                              0.2 * _glowAnimation.value,
-                            ),
-                            blurRadius: 90 * _glowAnimation.value,
-                            spreadRadius: 35 * _glowAnimation.value,
+                            blurRadius: 80 * _glowAnimation.value,
+                            spreadRadius: 28 * _glowAnimation.value,
                           ),
                         ],
                       ),
@@ -174,22 +167,20 @@ class _SplashScreenState extends State<SplashScreen>
               child: ShaderMask(
                 shaderCallback: (bounds) => const LinearGradient(
                   colors: [
-                    Color(0xFFFF6B9D), // Pink
-                    Color(0xFFC06CFF), // Purple
-                    Color(0xFF7B61FF), // Deep Purple
-                    Color(0xFF4D9FFF), // Blue
-                    Color(0xFF06B6D4), // Cyan
+                    NotionTheme.limePale,
+                    NotionTheme.lime,
+                    NotionTheme.green,
                   ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ).createShader(bounds),
                 child: const Text(
-                  'Linkat',
+                  'RefVault',
                   style: TextStyle(
-                    fontSize: 48,
+                    fontSize: 46,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
-                    letterSpacing: 3,
+                    letterSpacing: 2,
                   ),
                 ),
               ),
@@ -201,10 +192,10 @@ class _SplashScreenState extends State<SplashScreen>
             FadeTransition(
               opacity: _textFadeAnimation,
               child: Text(
-                'Save & Organize Your Links',
+                'Your AI knowledge vault',
                 style: TextStyle(
                   fontSize: 16,
-                  color: Colors.white.withOpacity(0.6),
+                  color: NotionTheme.fog.withValues(alpha: 0.7),
                   letterSpacing: 1.5,
                   fontWeight: FontWeight.w300,
                 ),
@@ -212,7 +203,7 @@ class _SplashScreenState extends State<SplashScreen>
             ),
           ],
         ),
-      ),
+      )),
     );
   }
 }

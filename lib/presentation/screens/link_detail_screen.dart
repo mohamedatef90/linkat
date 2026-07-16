@@ -12,6 +12,7 @@ import '../providers/link_providers.dart';
 import '../providers/sync_providers.dart';
 import '../theme/notion_theme.dart';
 import '../widgets/status_chip.dart';
+import '../widgets/magic/magic.dart';
 import 'reader_screen.dart';
 
 class LinkDetailScreen extends ConsumerStatefulWidget {
@@ -150,13 +151,13 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
       case PlatformType.instagram:
         return const Color(0xFFE4405F);
       case PlatformType.twitter:
-        return const Color(0xFF000000);
+        return NotionTheme.white; // X's black mark is invisible on navy
       case PlatformType.youtube:
         return const Color(0xFFFF0000);
       case PlatformType.linkedin:
-        return const Color(0xFF0A66C2);
+        return const Color(0xFF3B82F6);
       case PlatformType.other:
-        return NotionTheme.textGray;
+        return NotionTheme.fog2;
     }
   }
 
@@ -177,9 +178,9 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
     final isRead = link.readStatus == 'read';
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: NotionTheme.ink,
       appBar: AppBar(
-        backgroundColor: theme.scaffoldBackgroundColor,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         title: Row(
           children: [
@@ -254,7 +255,8 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
+      body: AuraBackground(
+        child: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -593,8 +595,8 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
                           icon: const Icon(Icons.open_in_new),
                           label: const Text('Open Link'),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: theme.primaryColor,
-                            foregroundColor: theme.colorScheme.onPrimary,
+                            backgroundColor: NotionTheme.lime,
+                            foregroundColor: NotionTheme.ink,
                             padding: const EdgeInsets.symmetric(vertical: 16),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
@@ -612,7 +614,7 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
             ),
           ],
         ),
-      ),
+      )),
     );
   }
 

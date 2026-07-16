@@ -5,6 +5,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../providers/link_providers.dart';
 import '../providers/sync_providers.dart';
 import '../theme/notion_theme.dart';
+import '../widgets/magic/magic.dart';
 
 /// Saves a URL through the save-item Edge Function. The server parses and
 /// AI-enriches asynchronously; this screen only shows an instant local
@@ -118,13 +119,14 @@ class _AddLinkScreenState extends ConsumerState<AddLinkScreen> {
     final foldersAsync = ref.watch(foldersProvider);
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: NotionTheme.ink,
       appBar: AppBar(
-        backgroundColor: theme.scaffoldBackgroundColor,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         title: Text('Add Link', style: theme.textTheme.titleMedium),
       ),
-      body: SingleChildScrollView(
+      body: AuraBackground(
+        child: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -273,40 +275,16 @@ class _AddLinkScreenState extends ConsumerState<AddLinkScreen> {
             ),
 
             const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _isSaving ? null : _save,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor:
-                      theme.floatingActionButtonTheme.backgroundColor,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  elevation: 0,
-                ),
-                child: _isSaving
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor:
-                              AlwaysStoppedAnimation<Color>(Colors.white),
-                        ),
-                      )
-                    : const Text(
-                        'Save Link',
-                        style: TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.w600),
-                      ),
-              ),
+            GradientButton(
+              label: 'Save Link',
+              icon: Icons.bookmark_add_outlined,
+              expand: true,
+              loading: _isSaving,
+              onPressed: _isSaving ? null : _save,
             ),
           ],
         ),
-      ),
+      )),
     );
   }
 }

@@ -10,7 +10,6 @@ import 'presentation/screens/folder_detail_screen.dart';
 import 'presentation/screens/home_screen.dart';
 import 'presentation/screens/splash_screen.dart';
 import 'presentation/theme/notion_theme.dart';
-import 'presentation/providers/theme_provider.dart';
 
 /// RefVault backend (shared with the web app). The anon key is public by
 /// design — all access is enforced by RLS + auth.
@@ -90,13 +89,12 @@ class LinkatApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final themeMode = ref.watch(themeModeProvider);
-
+    // Dark-only magic_black design language.
     return MaterialApp.router(
       title: 'Linkat',
-      theme: NotionTheme.lightTheme,
+      theme: NotionTheme.darkTheme,
       darkTheme: NotionTheme.darkTheme,
-      themeMode: themeMode,
+      themeMode: ThemeMode.dark,
       routerConfig: _router,
       debugShowCheckedModeBanner: false,
     );

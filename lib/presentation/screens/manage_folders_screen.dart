@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/sync_providers.dart';
 import '../theme/notion_theme.dart';
+import '../widgets/magic/magic.dart';
 import 'folder_items_screen.dart';
 
 /// CRUD for server-side folders (shared with the web app).
@@ -124,13 +125,14 @@ class ManageFoldersScreen extends ConsumerWidget {
     final foldersAsync = ref.watch(foldersProvider);
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: NotionTheme.ink,
       appBar: AppBar(
-        backgroundColor: theme.scaffoldBackgroundColor,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         title: Text('Folders', style: theme.textTheme.titleMedium),
       ),
-      body: foldersAsync.when(
+      body: AuraBackground(
+        child: foldersAsync.when(
         data: (folders) => folders.isEmpty
             ? Center(
                 child: Text(
@@ -176,7 +178,7 @@ class ManageFoldersScreen extends ConsumerWidget {
             style: theme.textTheme.bodyMedium?.copyWith(color: subtextColor),
           ),
         ),
-      ),
+      )),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _createFolder(context, ref),
         child: const Icon(Icons.create_new_folder_outlined),
