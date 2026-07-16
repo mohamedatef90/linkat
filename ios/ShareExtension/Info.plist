@@ -38,6 +38,6 @@
 		<string>com.apple.share-services</string>
 	</dict>
 	<key>AppGroupId</key>
-	<string>group.com.example.linkat</string>
+	<string>group.com.linkat</string>
 </dict>
 </plist>

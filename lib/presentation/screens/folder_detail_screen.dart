@@ -26,10 +26,6 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
   TopicType? _selectedTopic;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
-  bool _useAiSearch = true;
-  bool _isAiSearching = false;
-  List<Link>? _aiSearchResults;
-  String? _aiSearchExplanation;
   bool _isRefreshingAll = false;
   int _refreshProgress = 0;
   int _refreshTotal = 0;
@@ -132,51 +128,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
     }
   }
 
-  Future<void> _performAiSearch(List<Link> allLinks) async {
-    if (_searchQuery.isEmpty || !_useAiSearch) {
-      setState(() {
-        _aiSearchResults = null;
-        _aiSearchExplanation = null;
-      });
-      return;
-    }
-
-    final aiSearchService = ref.read(aiSearchServiceProvider);
-    if (!aiSearchService.isAvailable) {
-      return;
-    }
-
-    setState(() {
-      _isAiSearching = true;
-    });
-
-    final result = await aiSearchService.smartSearch(
-      query: _searchQuery,
-      allLinks: allLinks,
-    );
-
-    if (mounted) {
-      setState(() {
-        _aiSearchResults = result.results;
-        _aiSearchExplanation = result.explanation;
-        _isAiSearching = false;
-      });
-    }
-  }
-
   List<Link> _filterLinks(List<Link> links) {
-    // If AI search has results, use them
-    if (_aiSearchResults != null && _searchQuery.isNotEmpty && _useAiSearch) {
-      var filtered = _aiSearchResults!;
-      // Still apply topic filter on AI results
-      if (_selectedTopic != null) {
-        filtered = filtered
-            .where((link) => link.topic == _selectedTopic)
-            .toList();
-      }
-      return filtered;
-    }
-
     var filtered = links;
 
     // Filter by topic
@@ -830,71 +782,32 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                       onChanged: (value) {
                         setState(() {
                           _searchQuery = value;
-                          _aiSearchResults = null;
-                          _aiSearchExplanation = null;
                         });
-                      },
-                      onSubmitted: (_) {
-                        if (_useAiSearch && _searchQuery.isNotEmpty) {
-                          _performAiSearch(links);
-                        }
                       },
                       style: theme.textTheme.bodyLarge,
                       decoration: InputDecoration(
-                        hintText: _useAiSearch
-                            ? 'AI Search (e.g., "design articles", "coding tutorials")'
-                            : 'Search links...',
+                        hintText: 'Search links...',
                         hintStyle: TextStyle(
                           color: subtextColor.withOpacity(0.6),
                         ),
                         prefixIcon: Icon(
-                          _useAiSearch ? Icons.auto_awesome : Icons.search,
-                          color: _useAiSearch
-                              ? theme.primaryColor
-                              : subtextColor,
+                          Icons.search,
+                          color: subtextColor,
                           size: 20,
                         ),
                         suffixIcon: _searchQuery.isNotEmpty
-                            ? Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  if (_useAiSearch && !_isAiSearching)
-                                    IconButton(
-                                      icon: Icon(
-                                        Icons.send,
-                                        color: theme.primaryColor,
-                                        size: 20,
-                                      ),
-                                      onPressed: () => _performAiSearch(links),
-                                    ),
-                                  if (_isAiSearching)
-                                    Padding(
-                                      padding: const EdgeInsets.all(12),
-                                      child: SizedBox(
-                                        width: 16,
-                                        height: 16,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color: theme.primaryColor,
-                                        ),
-                                      ),
-                                    ),
-                                  IconButton(
-                                    icon: Icon(
-                                      Icons.clear,
-                                      color: subtextColor,
-                                      size: 20,
-                                    ),
-                                    onPressed: () {
-                                      setState(() {
-                                        _searchController.clear();
-                                        _searchQuery = '';
-                                        _aiSearchResults = null;
-                                        _aiSearchExplanation = null;
-                                      });
-                                    },
-                                  ),
-                                ],
+                            ? IconButton(
+                                icon: Icon(
+                                  Icons.clear,
+                                  color: subtextColor,
+                                  size: 20,
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    _searchController.clear();
+                                    _searchQuery = '';
+                                  });
+                                },
                               )
                             : null,
                         border: InputBorder.none,
@@ -904,76 +817,6 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            _useAiSearch = !_useAiSearch;
-                            _aiSearchResults = null;
-                            _aiSearchExplanation = null;
-                          });
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: _useAiSearch
-                                ? theme.primaryColor.withOpacity(0.1)
-                                : isDark
-                                ? NotionTheme.darkSurface
-                                : NotionTheme.backgroundOffWhite,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: _useAiSearch
-                                  ? theme.primaryColor
-                                  : borderColor,
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.auto_awesome,
-                                size: 14,
-                                color: _useAiSearch
-                                    ? theme.primaryColor
-                                    : subtextColor,
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                'AI Search',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: _useAiSearch
-                                      ? theme.primaryColor
-                                      : subtextColor,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      if (_aiSearchExplanation != null) ...[
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            _aiSearchExplanation!,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: subtextColor,
-                              fontStyle: FontStyle.italic,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ],
                   ),
                 ],
               ),
@@ -1064,7 +907,7 @@ class _FolderDetailScreenState extends ConsumerState<FolderDetailScreen> {
     );
   }
 
-  IconData _getIcon(PlatformType platform) {
+  FaIconData _getIcon(PlatformType platform) {
     switch (platform) {
       case PlatformType.facebook:
         return FontAwesomeIcons.facebook;

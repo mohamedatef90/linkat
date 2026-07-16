@@ -3,7 +3,7 @@ import Social
 import MobileCoreServices
 import UniformTypeIdentifiers
 
-private let appGroupId = "group.com.example.linkat"
+private let appGroupId = "group.com.linkat"
 private let pendingLinksKey = "PendingLinks"
 private let appURLScheme = "ShareMedia-com.example.linkat://"
 

@@ -1,25 +1,39 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:linkat/main.dart';
+import 'package:linkat/presentation/screens/auth_screen.dart';
+import 'package:linkat/presentation/theme/notion_theme.dart';
 
 void main() {
-  testWidgets('App smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const ProviderScope(child: LinkatApp()));
+  Widget buildAuthScreen() {
+    return ProviderScope(
+      child: MaterialApp(
+        theme: NotionTheme.lightTheme,
+        home: const AuthScreen(),
+      ),
+    );
+  }
 
-    // Verify that the app title is displayed.
-    expect(find.text('Linkat'), findsOneWidget);
+  testWidgets('Auth screen renders and toggles sign in / sign up',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(buildAuthScreen());
 
-    // Verify that the FAB is present.
-    expect(find.byIcon(Icons.add), findsOneWidget);
+    expect(find.text('Welcome back'), findsOneWidget);
+    expect(find.text('Sign In'), findsOneWidget);
+    expect(find.byType(TextField), findsNWidgets(2));
+
+    await tester.tap(find.text("Don't have an account? Sign up"));
+    await tester.pump();
+    expect(find.text('Create your account'), findsOneWidget);
+    expect(find.text('Sign Up'), findsOneWidget);
+  });
+
+  testWidgets('Auth screen rejects empty submit', (tester) async {
+    await tester.pumpWidget(buildAuthScreen());
+
+    await tester.tap(find.text('Sign In'));
+    await tester.pump();
+    expect(find.text('Enter your email and password'), findsOneWidget);
   });
 }

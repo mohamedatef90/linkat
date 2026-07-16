@@ -8,14 +8,12 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../domain/entities/link.dart';
 import '../../domain/entities/platform_type.dart';
-import '../../domain/entities/topic_type.dart';
-import '../../data/services/translation_service.dart';
 import '../providers/link_providers.dart';
+import '../providers/sync_providers.dart';
 import '../theme/notion_theme.dart';
-
-final _translationServiceProvider = Provider<TranslationService>((ref) {
-  return TranslationService();
-});
+import '../widgets/status_chip.dart';
+import '../widgets/magic/magic.dart';
+import 'reader_screen.dart';
 
 class LinkDetailScreen extends ConsumerStatefulWidget {
   final Link link;
@@ -27,33 +25,14 @@ class LinkDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
-  String? _translatedSummary;
-  bool _isTranslating = false;
-  bool _isGeneratingAiSummary = false;
-  bool _isRefreshingMetadata = false;
-  String _selectedLanguage = 'Arabic';
-  late TopicType _currentTopic;
   late Link _currentLink;
+  bool _isRefreshingMetadata = false;
 
   @override
   void initState() {
     super.initState();
-    _currentTopic = widget.link.topic;
     _currentLink = widget.link;
   }
-
-  final List<String> _languages = [
-    'Arabic',
-    'Spanish',
-    'French',
-    'German',
-    'Chinese',
-    'Japanese',
-    'Korean',
-    'Portuguese',
-    'Russian',
-    'Italian',
-  ];
 
   Future<void> _launchUrl(String url) async {
     final cleanUrl = url.trim().replaceAll(
@@ -66,174 +45,73 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
     }
   }
 
-  Future<void> _translateSummary() async {
-    final translationService = ref.read(_translationServiceProvider);
-
-    if (!translationService.isAvailable) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Translation service not available. Check API key.'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-      return;
-    }
-
-    if (_currentLink.aiDescription == null) return;
-
-    setState(() {
-      _isTranslating = true;
-    });
-
+  /// Optimistic edit of the fields the server accepts from clients
+  /// (title / pin / star / read); the sync service pushes it.
+  Future<void> _applyUpdate(Link updated) async {
+    setState(() => _currentLink = updated);
     try {
-      final translated = await translationService.translate(
-        text: _currentLink.aiDescription!,
-        targetLanguage: _selectedLanguage,
-      );
-      if (mounted) {
-        setState(() {
-          _translatedSummary = translated;
-        });
-      }
+      final result = await ref.read(syncControllerProvider).updateLink(updated);
+      if (mounted) setState(() => _currentLink = result);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Translation failed: $e'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isTranslating = false;
-        });
-      }
-    }
-  }
-
-  void _clearTranslation() {
-    setState(() {
-      _translatedSummary = null;
-    });
-  }
-
-  Future<void> _generateAiSummary() async {
-    final aiService = ref.read(aiDescriptionServiceProvider);
-    final updateLink = ref.read(updateLinkProvider);
-
-    setState(() {
-      _isGeneratingAiSummary = true;
-    });
-
-    try {
-      final aiDescription = await aiService.generateDescription(
-        url: _currentLink.url,
-        title: _currentLink.title,
-        existingDescription: _currentLink.description,
-      );
-
-      if (aiDescription != null && mounted) {
-        final updatedLink = _currentLink.copyWith(aiDescription: aiDescription);
-        await updateLink(updatedLink);
-
-        setState(() {
-          _currentLink = updatedLink;
-        });
-
-        // Invalidate providers to refresh data
-        ref.invalidate(allLinksProvider);
-        ref.invalidate(linksProvider);
-
-        ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('AI Summary generated successfully'),
-            behavior: SnackBarBehavior.floating,
-            duration: Duration(seconds: 2),
-          ),
-        );
-      } else if (mounted) {
-        final errorMsg = aiService.lastError ?? 'Failed to generate AI Summary';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMsg),
-            behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 4),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
+            content: Text('Change queued — will sync when online'),
             behavior: SnackBarBehavior.floating,
           ),
         );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isGeneratingAiSummary = false;
-        });
       }
     }
   }
 
+  Future<void> _deleteLink() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete link?'),
+        content: const Text('This removes it from all your devices.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await ref.read(syncControllerProvider).deleteLink(_currentLink);
+    if (mounted) Navigator.of(context).pop();
+  }
+
+  /// Local-only refresh of the preview metadata (server owns the real data).
   Future<void> _refreshMetadata() async {
     if (_isRefreshingMetadata) return;
-
-    setState(() {
-      _isRefreshingMetadata = true;
-    });
+    setState(() => _isRefreshingMetadata = true);
 
     try {
       final metadataService = ref.read(metadataServiceProvider);
-      final updateLink = ref.read(updateLinkProvider);
-
-      // Fetch fresh metadata from the URL
+      final repository = ref.read(linkRepositoryProvider);
       final metadata = await metadataService.fetchMetadata(_currentLink.url);
 
       if (mounted) {
         final updatedLink = _currentLink.copyWith(
-          title: metadata['title'] ?? _currentLink.title,
           description: metadata['description'] ?? _currentLink.description,
-          imageUrl: metadata['image'],
+          imageUrl: metadata['image'] ?? _currentLink.imageUrl,
           publisherName: metadata['publisher'] ?? _currentLink.publisherName,
         );
+        await repository.updateLink(updatedLink);
 
-        await updateLink(updatedLink);
-
-        // Clear the cached image so it fetches fresh
         if (metadata['image'] != null) {
           await CachedNetworkImage.evictFromCache(metadata['image']!);
         }
-        if (_currentLink.imageUrl != null) {
-          await CachedNetworkImage.evictFromCache(_currentLink.imageUrl!);
-        }
 
-        setState(() {
-          _currentLink = updatedLink;
-        });
-
-        // Invalidate providers to refresh data
-        ref.invalidate(allLinksProvider);
-        ref.invalidate(linksProvider);
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              metadata['image'] != null
-                  ? 'Metadata refreshed successfully'
-                  : 'Refreshed, but no image found',
-            ),
-            behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 2),
-          ),
-        );
+        setState(() => _currentLink = updatedLink);
+        ref.read(syncControllerProvider).refreshLinkProviders();
       }
     } catch (e) {
       if (mounted) {
@@ -245,123 +123,11 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
         );
       }
     } finally {
-      if (mounted) {
-        setState(() {
-          _isRefreshingMetadata = false;
-        });
-      }
+      if (mounted) setState(() => _isRefreshingMetadata = false);
     }
   }
 
-  Future<void> _showTopicSelector() async {
-    final selectedTopic = await showModalBottomSheet<TopicType>(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (context) => _TopicSelectorSheet(currentTopic: _currentTopic),
-    );
-
-    if (selectedTopic != null && selectedTopic != _currentTopic) {
-      await _updateTopic(selectedTopic);
-    }
-  }
-
-  Future<void> _updateTopic(TopicType newTopic) async {
-    final updateLink = ref.read(updateLinkProvider);
-
-    final updatedLink = Link(
-      id: _currentLink.id,
-      url: _currentLink.url,
-      title: _currentLink.title,
-      description: _currentLink.description,
-      imageUrl: _currentLink.imageUrl,
-      platform: _currentLink.platform,
-      topic: newTopic,
-      createdAt: _currentLink.createdAt,
-      publisherName: _currentLink.publisherName,
-      aiDescription: _currentLink.aiDescription,
-      tags: _currentLink.tags,
-    );
-
-    try {
-      await updateLink(updatedLink);
-
-      setState(() {
-        _currentTopic = newTopic;
-        _currentLink = updatedLink;
-      });
-
-      // Invalidate providers to refresh data
-      ref.invalidate(allLinksProvider);
-      ref.invalidate(linksByTopicProvider(newTopic));
-      ref.invalidate(linksProvider);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Topic updated to ${newTopic.displayName}'),
-            behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 2),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to update topic'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    }
-  }
-
-  IconData _getTopicIcon(TopicType topic) {
-    switch (topic) {
-      case TopicType.aiTech:
-        return Icons.psychology;
-      case TopicType.development:
-        return Icons.code;
-      case TopicType.productUX:
-        return Icons.design_services;
-      case TopicType.design:
-        return Icons.palette;
-      case TopicType.business:
-        return Icons.business;
-      case TopicType.science:
-        return Icons.science;
-      case TopicType.entertainment:
-        return Icons.movie;
-      case TopicType.other:
-        return Icons.more_horiz;
-    }
-  }
-
-  Color _getTopicColor(TopicType topic) {
-    switch (topic) {
-      case TopicType.aiTech:
-        return const Color(0xFF9333EA);
-      case TopicType.development:
-        return const Color(0xFF06B6D4);
-      case TopicType.productUX:
-        return const Color(0xFF3B82F6);
-      case TopicType.design:
-        return const Color(0xFFEC4899);
-      case TopicType.business:
-        return const Color(0xFF10B981);
-      case TopicType.science:
-        return const Color(0xFFF59E0B);
-      case TopicType.entertainment:
-        return const Color(0xFFEF4444);
-      case TopicType.other:
-        return NotionTheme.textGray;
-    }
-  }
-
-  IconData _getPlatformIcon(PlatformType platform) {
+  FaIconData _getPlatformIcon(PlatformType platform) {
     switch (platform) {
       case PlatformType.facebook:
         return FontAwesomeIcons.facebook;
@@ -385,13 +151,13 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
       case PlatformType.instagram:
         return const Color(0xFFE4405F);
       case PlatformType.twitter:
-        return const Color(0xFF000000);
+        return NotionTheme.white; // X's black mark is invisible on navy
       case PlatformType.youtube:
         return const Color(0xFFFF0000);
       case PlatformType.linkedin:
-        return const Color(0xFF0A66C2);
+        return const Color(0xFF3B82F6);
       case PlatformType.other:
-        return NotionTheme.textGray;
+        return NotionTheme.fog2;
     }
   }
 
@@ -401,19 +167,20 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    final borderColor = isDark
-        ? NotionTheme.darkDivider
-        : NotionTheme.dividerColor;
-    final textColor = isDark ? NotionTheme.darkTextPrimary : NotionTheme.primaryBlack;
-    final subtextColor = isDark ? NotionTheme.darkTextSecondary : NotionTheme.textGray;
-    final sidebarColor = isDark
-        ? NotionTheme.darkSidebar
-        : NotionTheme.sidebarColor;
+    final borderColor =
+        isDark ? NotionTheme.darkDivider : NotionTheme.dividerColor;
+    final textColor =
+        isDark ? NotionTheme.darkTextPrimary : NotionTheme.primaryBlack;
+    final subtextColor =
+        isDark ? NotionTheme.darkTextSecondary : NotionTheme.textGray;
+    final sidebarColor =
+        isDark ? NotionTheme.darkSidebar : NotionTheme.sidebarColor;
+    final isRead = link.readStatus == 'read';
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: NotionTheme.ink,
       appBar: AppBar(
-        backgroundColor: theme.scaffoldBackgroundColor,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         title: Row(
           children: [
@@ -423,24 +190,29 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
               color: _getPlatformColor(link.platform),
             ),
             const SizedBox(width: 8),
-            Text(link.platform.displayName, style: theme.textTheme.titleMedium),
+            Text(link.platform.displayName,
+                style: theme.textTheme.titleMedium),
           ],
         ),
         iconTheme: IconThemeData(color: textColor),
         actions: [
           IconButton(
-            icon: _isRefreshingMetadata
-                ? SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: textColor,
-                    ),
-                  )
-                : Icon(Icons.refresh, color: textColor),
-            onPressed: _isRefreshingMetadata ? null : _refreshMetadata,
-            tooltip: 'Refresh metadata',
+            icon: Icon(
+              link.isStarred ? Icons.star : Icons.star_border,
+              color: link.isStarred ? Colors.amber[600] : textColor,
+            ),
+            onPressed: () =>
+                _applyUpdate(link.copyWith(isStarred: !link.isStarred)),
+            tooltip: link.isStarred ? 'Unstar' : 'Star',
+          ),
+          IconButton(
+            icon: Icon(
+              link.isPinned ? Icons.push_pin : Icons.push_pin_outlined,
+              color: textColor,
+            ),
+            onPressed: () =>
+                _applyUpdate(link.copyWith(isPinned: !link.isPinned)),
+            tooltip: link.isPinned ? 'Unpin' : 'Pin',
           ),
           IconButton(
             icon: Icon(Icons.share, color: textColor),
@@ -459,9 +231,32 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
               }
             },
           ),
+          PopupMenuButton<String>(
+            iconColor: textColor,
+            onSelected: (action) {
+              if (action == 'refresh') _refreshMetadata();
+              if (action == 'delete') _deleteLink();
+              if (action == 'read') {
+                _applyUpdate(
+                    link.copyWith(readStatus: isRead ? 'unread' : 'read'));
+              }
+            },
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: 'read',
+                child: Text(isRead ? 'Mark as unread' : 'Mark as read'),
+              ),
+              const PopupMenuItem(
+                value: 'refresh',
+                child: Text('Refresh preview'),
+              ),
+              const PopupMenuItem(value: 'delete', child: Text('Delete')),
+            ],
+          ),
         ],
       ),
-      body: SingleChildScrollView(
+      body: AuraBackground(
+        child: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -483,46 +278,13 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
                   ),
                   errorWidget: (context, url, error) => Container(
                     color: sidebarColor,
-                    child: _isRefreshingMetadata
-                        ? Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                CircularProgressIndicator(
-                                  color: theme.colorScheme.primary,
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Refreshing...',
-                                  style: TextStyle(color: subtextColor, fontSize: 12),
-                                ),
-                              ],
-                            ),
-                          )
-                        : Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.broken_image_outlined,
-                                size: 48,
-                                color: subtextColor,
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'Image unavailable',
-                                style: TextStyle(color: subtextColor, fontSize: 12),
-                              ),
-                              const SizedBox(height: 8),
-                              TextButton.icon(
-                                onPressed: _refreshMetadata,
-                                icon: const Icon(Icons.refresh, size: 16),
-                                label: const Text('Refresh'),
-                                style: TextButton.styleFrom(
-                                  foregroundColor: theme.colorScheme.primary,
-                                ),
-                              ),
-                            ],
-                          ),
+                    child: Center(
+                      child: Icon(
+                        Icons.broken_image_outlined,
+                        size: 48,
+                        color: subtextColor,
+                      ),
+                    ),
                   ),
                 ),
               )
@@ -541,26 +303,30 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Title
-                  Text(link.title, style: theme.textTheme.displayMedium),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(link.title,
+                            style: theme.textTheme.displayMedium),
+                      ),
+                      const SizedBox(width: 8),
+                      StatusChip(link: link),
+                    ],
+                  ),
 
                   const SizedBox(height: 8),
 
-                  // Publisher name
                   if (link.publisherName != null) ...[
                     Row(
                       children: [
-                        Icon(
-                          Icons.person_outline,
-                          size: 16,
-                          color: subtextColor,
-                        ),
+                        Icon(Icons.person_outline,
+                            size: 16, color: subtextColor),
                         const SizedBox(width: 4),
                         Text(
                           link.publisherName!,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: subtextColor,
-                          ),
+                          style: theme.textTheme.bodyMedium
+                              ?.copyWith(color: subtextColor),
                         ),
                       ],
                     ),
@@ -611,7 +377,7 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
                   Divider(color: borderColor),
                   const SizedBox(height: 16),
 
-                  // AI Summary Section
+                  // Summary (generated by the server pipeline)
                   _buildSectionHeader(
                     context,
                     icon: Icons.auto_awesome,
@@ -620,7 +386,7 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
                     textColor: subtextColor,
                   ),
                   const SizedBox(height: 8),
-                  if (link.aiDescription != null) ...[
+                  if (link.summary != null || link.aiDescription != null)
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
@@ -632,102 +398,12 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
                         ),
                       ),
                       child: Text(
-                        _translatedSummary ?? link.aiDescription!,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          height: 1.6,
-                        ),
+                        link.summary ?? link.aiDescription!,
+                        style:
+                            theme.textTheme.bodyMedium?.copyWith(height: 1.6),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    // Translation controls for AI Summary
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            decoration: BoxDecoration(
-                              color: sidebarColor,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: borderColor),
-                            ),
-                            child: DropdownButtonHideUnderline(
-                              child: DropdownButton<String>(
-                                value: _selectedLanguage,
-                                isExpanded: true,
-                                icon: Icon(
-                                  Icons.keyboard_arrow_down,
-                                  color: subtextColor,
-                                ),
-                                dropdownColor: isDark
-                                    ? NotionTheme.darkSurface
-                                    : Colors.white,
-                                style: TextStyle(color: textColor),
-                                items: _languages.map((lang) {
-                                  return DropdownMenuItem(
-                                    value: lang,
-                                    child: Text(
-                                      lang,
-                                      style: TextStyle(color: textColor),
-                                    ),
-                                  );
-                                }).toList(),
-                                onChanged: (value) {
-                                  if (value != null) {
-                                    setState(() {
-                                      _selectedLanguage = value;
-                                    });
-                                  }
-                                },
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        ElevatedButton.icon(
-                          onPressed: _isTranslating ? null : _translateSummary,
-                          icon: _isTranslating
-                              ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : const Icon(Icons.translate, size: 18),
-                          label: Text(
-                            _isTranslating ? 'Translating...' : 'Translate',
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: theme.colorScheme.primary,
-                            foregroundColor: theme.colorScheme.onPrimary,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 12,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            elevation: 0,
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (_translatedSummary != null) ...[
-                      const SizedBox(height: 8),
-                      TextButton.icon(
-                        onPressed: _clearTranslation,
-                        icon: Icon(Icons.clear, size: 16, color: subtextColor),
-                        label: Text(
-                          'Show original',
-                          style: TextStyle(color: subtextColor),
-                        ),
-                        style: TextButton.styleFrom(
-                          foregroundColor: subtextColor,
-                        ),
-                      ),
-                    ],
-                  ] else
+                    )
+                  else
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
@@ -736,49 +412,56 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(color: borderColor),
                       ),
-                      child: Column(
-                        children: [
-                          Text(
-                            'No AI summary available',
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: subtextColor,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          ElevatedButton.icon(
-                            onPressed: _isGeneratingAiSummary ? null : _generateAiSummary,
-                            icon: _isGeneratingAiSummary
-                                ? const SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.white,
-                                    ),
-                                  )
-                                : const Icon(Icons.auto_awesome, size: 18),
-                            label: Text(
-                              _isGeneratingAiSummary ? 'Generating...' : 'Generate AI Summary',
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: theme.colorScheme.primary,
-                              foregroundColor: theme.colorScheme.onPrimary,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 10,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              elevation: 0,
-                            ),
-                          ),
-                        ],
+                      child: Text(
+                        link.status.isProcessing
+                            ? 'The summary is being generated — it usually '
+                                'takes about a minute.'
+                            : 'No AI summary available for this item.',
+                        style: theme.textTheme.bodyMedium
+                            ?.copyWith(color: subtextColor),
                       ),
                     ),
                   const SizedBox(height: 16),
 
-                  // Description Section
+                  // Key points
+                  if (link.keyPoints.isNotEmpty) ...[
+                    _buildSectionHeader(
+                      context,
+                      icon: Icons.format_list_bulleted,
+                      title: 'Key Points',
+                      textColor: subtextColor,
+                    ),
+                    const SizedBox(height: 8),
+                    ...link.keyPoints.map(
+                      (point) => Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.only(top: 7),
+                              child: Container(
+                                width: 5,
+                                height: 5,
+                                decoration: BoxDecoration(
+                                  color: theme.colorScheme.primary,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(point,
+                                  style: theme.textTheme.bodyMedium),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+
+                  // Description
                   if (link.description != null) ...[
                     _buildSectionHeader(
                       context,
@@ -797,15 +480,14 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
                       ),
                       child: Text(
                         link.description!,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          height: 1.6,
-                        ),
+                        style:
+                            theme.textTheme.bodyMedium?.copyWith(height: 1.6),
                       ),
                     ),
                     const SizedBox(height: 16),
                   ],
 
-                  // Tags Section
+                  // Tags
                   if (link.tags.isNotEmpty) ...[
                     Divider(color: borderColor),
                     const SizedBox(height: 16),
@@ -842,7 +524,7 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
                     const SizedBox(height: 16),
                   ],
 
-                  // Metadata Section
+                  // Details
                   Divider(color: borderColor),
                   const SizedBox(height: 16),
                   _buildSectionHeader(
@@ -852,51 +534,17 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
                     textColor: subtextColor,
                   ),
                   const SizedBox(height: 8),
-                  // Topic row with edit button
-                  InkWell(
-                    onTap: _showTopicSelector,
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: _getTopicColor(
-                          _currentTopic,
-                        ).withOpacity(isDark ? 0.2 : 0.1),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: _getTopicColor(_currentTopic).withOpacity(0.3),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            _getTopicIcon(_currentTopic),
-                            size: 16,
-                            color: _getTopicColor(_currentTopic),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            _currentTopic.displayName,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: _getTopicColor(_currentTopic),
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Icon(
-                            Icons.edit,
-                            size: 14,
-                            color: _getTopicColor(_currentTopic),
-                          ),
-                        ],
-                      ),
+                  ...[
+                    _buildMetadataRow(
+                      context,
+                      icon: Icons.category_outlined,
+                      label: 'Topic',
+                      value: link.topicLabel ?? link.topic.displayName,
+                      textColor: textColor,
+                      subtextColor: subtextColor,
                     ),
-                  ),
-                  const SizedBox(height: 8),
+                    const SizedBox(height: 8),
+                  ],
                   _buildMetadataRow(
                     context,
                     icon: Icons.calendar_today_outlined,
@@ -905,26 +553,59 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
                     textColor: textColor,
                     subtextColor: subtextColor,
                   ),
+                  const SizedBox(height: 8),
+                  _buildMetadataRow(
+                    context,
+                    icon: isRead
+                        ? Icons.check_circle_outline
+                        : Icons.radio_button_unchecked,
+                    label: 'Read status',
+                    value: link.readStatus,
+                    textColor: textColor,
+                    subtextColor: subtextColor,
+                  ),
 
                   const SizedBox(height: 24),
 
-                  // Open Link Button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: () => _launchUrl(link.url),
-                      icon: const Icon(Icons.open_in_new),
-                      label: const Text('Open Link'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: theme.primaryColor,
-                        foregroundColor: theme.colorScheme.onPrimary,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => ReaderScreen(link: link),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.chrome_reader_mode_outlined),
+                          label: const Text('Reader'),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
                         ),
-                        elevation: 0,
                       ),
-                    ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () => _launchUrl(link.url),
+                          icon: const Icon(Icons.open_in_new),
+                          label: const Text('Open Link'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: NotionTheme.lime,
+                            foregroundColor: NotionTheme.ink,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 0,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
 
                   const SizedBox(height: 32),
@@ -933,7 +614,7 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
             ),
           ],
         ),
-      ),
+      )),
     );
   }
 
@@ -955,9 +636,9 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
         Text(
           title,
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            fontWeight: FontWeight.w600,
-            color: textColor ?? NotionTheme.textGray,
-          ),
+                fontWeight: FontWeight.w600,
+                color: textColor ?? NotionTheme.textGray,
+              ),
         ),
       ],
     );
@@ -978,8 +659,8 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
         Text(
           '$label: ',
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: subtextColor ?? NotionTheme.textGray,
-          ),
+                color: subtextColor ?? NotionTheme.textGray,
+              ),
         ),
         Expanded(
           child: Text(
@@ -990,111 +671,6 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _TopicSelectorSheet extends StatelessWidget {
-  final TopicType currentTopic;
-
-  const _TopicSelectorSheet({required this.currentTopic});
-
-  IconData _getTopicIcon(TopicType topic) {
-    switch (topic) {
-      case TopicType.aiTech:
-        return Icons.psychology;
-      case TopicType.development:
-        return Icons.code;
-      case TopicType.productUX:
-        return Icons.design_services;
-      case TopicType.design:
-        return Icons.palette;
-      case TopicType.business:
-        return Icons.business;
-      case TopicType.science:
-        return Icons.science;
-      case TopicType.entertainment:
-        return Icons.movie;
-      case TopicType.other:
-        return Icons.more_horiz;
-    }
-  }
-
-  Color _getTopicColor(TopicType topic) {
-    switch (topic) {
-      case TopicType.aiTech:
-        return const Color(0xFF9333EA);
-      case TopicType.development:
-        return const Color(0xFF06B6D4);
-      case TopicType.productUX:
-        return const Color(0xFF3B82F6);
-      case TopicType.design:
-        return const Color(0xFFEC4899);
-      case TopicType.business:
-        return const Color(0xFF10B981);
-      case TopicType.science:
-        return const Color(0xFFF59E0B);
-      case TopicType.entertainment:
-        return const Color(0xFFEF4444);
-      case TopicType.other:
-        return NotionTheme.textGray;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                const Icon(Icons.category, size: 20),
-                const SizedBox(width: 8),
-                Text(
-                  'Select Topic',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          const Divider(color: NotionTheme.dividerColor, height: 1),
-          ...TopicType.values.map((topic) {
-            final isSelected = topic == currentTopic;
-            final color = _getTopicColor(topic);
-            return ListTile(
-              leading: Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(_getTopicIcon(topic), size: 18, color: color),
-              ),
-              title: Text(
-                topic.displayName,
-                style: TextStyle(
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                  color: isSelected ? color : null,
-                ),
-              ),
-              trailing: isSelected
-                  ? Icon(Icons.check_circle, color: color)
-                  : null,
-              onTap: () => Navigator.of(context).pop(topic),
-            );
-          }),
-          const SizedBox(height: 8),
-        ],
-      ),
     );
   }
 }

@@ -1,6 +1,7 @@
 import 'platform_type.dart';
 import 'topic_type.dart';
 import 'content_type.dart';
+import 'sync_types.dart';
 
 class Link {
   final int? id;
@@ -8,6 +9,7 @@ class Link {
   final String title;
   final String? description;
   final String? imageUrl;
+  final String? faviconUrl;
   final String? publisherName;
   final String? aiDescription;
   final PlatformType platform;
@@ -17,12 +19,26 @@ class Link {
   final DateTime createdAt;
   final int? customCategoryId;
 
+  // Sync fields (server = Supabase content_items)
+  final String? remoteId;
+  final DateTime? updatedAt;
+  final PendingOp pendingOp;
+  final String? summary;
+  final List<String> keyPoints;
+  final String? topicLabel;
+  final ItemStatus status;
+  final String readStatus;
+  final bool isStarred;
+  final bool isPinned;
+  final List<String> folderRemoteIds;
+
   Link({
     this.id,
     required this.url,
     required this.title,
     this.description,
     this.imageUrl,
+    this.faviconUrl,
     this.publisherName,
     this.aiDescription,
     required this.platform,
@@ -31,6 +47,17 @@ class Link {
     this.tags = const [],
     required this.createdAt,
     this.customCategoryId,
+    this.remoteId,
+    this.updatedAt,
+    this.pendingOp = PendingOp.none,
+    this.summary,
+    this.keyPoints = const [],
+    this.topicLabel,
+    this.status = ItemStatus.ready,
+    this.readStatus = 'unread',
+    this.isStarred = false,
+    this.isPinned = false,
+    this.folderRemoteIds = const [],
   });
 
   Link copyWith({
@@ -39,6 +66,7 @@ class Link {
     String? title,
     String? description,
     String? imageUrl,
+    String? faviconUrl,
     String? publisherName,
     String? aiDescription,
     PlatformType? platform,
@@ -47,6 +75,17 @@ class Link {
     List<String>? tags,
     DateTime? createdAt,
     int? customCategoryId,
+    String? remoteId,
+    DateTime? updatedAt,
+    PendingOp? pendingOp,
+    String? summary,
+    List<String>? keyPoints,
+    String? topicLabel,
+    ItemStatus? status,
+    String? readStatus,
+    bool? isStarred,
+    bool? isPinned,
+    List<String>? folderRemoteIds,
   }) {
     return Link(
       id: id ?? this.id,
@@ -54,6 +93,7 @@ class Link {
       title: title ?? this.title,
       description: description ?? this.description,
       imageUrl: imageUrl ?? this.imageUrl,
+      faviconUrl: faviconUrl ?? this.faviconUrl,
       publisherName: publisherName ?? this.publisherName,
       aiDescription: aiDescription ?? this.aiDescription,
       platform: platform ?? this.platform,
@@ -62,6 +102,17 @@ class Link {
       tags: tags ?? this.tags,
       createdAt: createdAt ?? this.createdAt,
       customCategoryId: customCategoryId ?? this.customCategoryId,
+      remoteId: remoteId ?? this.remoteId,
+      updatedAt: updatedAt ?? this.updatedAt,
+      pendingOp: pendingOp ?? this.pendingOp,
+      summary: summary ?? this.summary,
+      keyPoints: keyPoints ?? this.keyPoints,
+      topicLabel: topicLabel ?? this.topicLabel,
+      status: status ?? this.status,
+      readStatus: readStatus ?? this.readStatus,
+      isStarred: isStarred ?? this.isStarred,
+      isPinned: isPinned ?? this.isPinned,
+      folderRemoteIds: folderRemoteIds ?? this.folderRemoteIds,
     );
   }
 }

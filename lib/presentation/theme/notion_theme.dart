@@ -2,100 +2,128 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class NotionTheme {
-  // Light mode colors - Clean & Fresh
-  static const Color primaryBlack = Color(0xFF1A1A2E);
-  static const Color backgroundOffWhite = Color(0xFFFAFAFC);
-  static const Color sidebarColor = Color(0xFFF0F0F5);
-  static const Color dividerColor = Color(0xFFE8E8ED);
-  static const Color textGray = Color(0xFF6B7280);
+  // ============================================================
+  // magic_black design tokens (ported from the web app's index.html).
+  // NOTE: this class keeps its original member NAMES for source
+  // compatibility, but every value now points at the magic_black
+  // palette. The app is dark-only; the "light" constants resolve to
+  // the same dark tokens so any `isDark ? dark : light` branch is safe.
+  // ============================================================
 
-  // Modern Dark mode colors - Deep & Rich
-  static const Color darkBackground = Color(0xFF0D0D12);
-  static const Color darkSurface = Color(0xFF1A1A24);
-  static const Color darkSurfaceElevated = Color(0xFF22222E);
-  static const Color darkSidebar = Color(0xFF141420);
-  static const Color darkDivider = Color(0xFF2E2E3A);
-  static const Color darkTextPrimary = Color(0xFFF5F5F7);
-  static const Color darkTextSecondary = Color(0xFF8E8E9A);
-  static const Color darkTextMuted = Color(0xFF5C5C6A);
+  // Canvas
+  static const Color ink = Color(0xFF0A1320); // near-black navy
+  static const Color ink2 = Color(0xFF0D1B2B); // lifted canvas
+  static const Color panel = Color(0xFF111F33); // solid glass fallback
+  static const Color panelElevated = Color(0xFF16263E);
 
-  // Vibrant Accent colors
-  static const Color accentPurple = Color(0xFF8B5CF6);
-  static const Color accentPurpleLight = Color(0xFFA78BFA);
+  // Accent (green -> lime gradient)
+  static const Color green = Color(0xFF7CB342);
+  static const Color lime = Color(0xFFA8CF38);
+  static const Color limePale = Color(0xFFCDE9A2);
+
+  // Text "fog" greys on navy
+  static const Color white = Color(0xFFF4F8FE); // headings
+  static const Color fog = Color(0xFFC5D2E2); // body
+  static const Color fog2 = Color(0xFF8497AE); // muted
+  static const Color borderSoft = Color(0x14C5D2E2); // rgba(197,210,226,.08)
+
+  static const LinearGradient grad = LinearGradient(
+    colors: [green, lime],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  // ---- Compatibility aliases (repointed to magic_black) ----
+
+  // Light mode names -> dark tokens (dark-only app)
+  static const Color primaryBlack = white; // now primary (light) text
+  static const Color backgroundOffWhite = ink;
+  static const Color sidebarColor = ink2;
+  static const Color dividerColor = Color(0xFF22344B);
+  static const Color textGray = fog2;
+
+  // Dark mode names
+  static const Color darkBackground = ink;
+  static const Color darkSurface = panel;
+  static const Color darkSurfaceElevated = panelElevated;
+  static const Color darkSidebar = ink2;
+  static const Color darkDivider = Color(0xFF22344B);
+  static const Color darkTextPrimary = white;
+  static const Color darkTextSecondary = fog2;
+  static const Color darkTextMuted = Color(0xFF5C6E86);
+
+  // Primary accent is now lime; secondary content-type accents kept
+  static const Color accentPurple = lime;
+  static const Color accentPurpleLight = limePale;
   static const Color accentPink = Color(0xFFEC4899);
   static const Color accentPinkLight = Color(0xFFF472B6);
   static const Color accentBlue = Color(0xFF3B82F6);
   static const Color accentBlueLight = Color(0xFF60A5FA);
   static const Color accentCyan = Color(0xFF06B6D4);
   static const Color accentCyanLight = Color(0xFF22D3EE);
-  static const Color accentGreen = Color(0xFF10B981);
-  static const Color accentGreenLight = Color(0xFF34D399);
+  static const Color accentGreen = green;
+  static const Color accentGreenLight = lime;
   static const Color accentOrange = Color(0xFFF97316);
   static const Color accentYellow = Color(0xFFFBBF24);
   static const Color accentRed = Color(0xFFEF4444);
 
-  // Dark mode accent (keeping for compatibility)
-  static const Color darkAccentPrimary = Color(0xFF8B5CF6);
-  static const Color darkAccentSecondary = Color(0xFF3B82F6);
-  static const Color darkAccentTertiary = Color(0xFFEC4899);
+  static const Color darkAccentPrimary = lime;
+  static const Color darkAccentSecondary = green;
+  static const Color darkAccentTertiary = limePale;
 
-  // Gradient presets
-  static const LinearGradient primaryGradient = LinearGradient(
-    colors: [accentPurple, accentPink],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-  );
+  // Gradient presets (primary = green->lime)
+  static const LinearGradient primaryGradient = grad;
 
   static const LinearGradient secondaryGradient = LinearGradient(
-    colors: [accentBlue, accentCyan],
+    colors: [green, lime],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
 
   static const LinearGradient warmGradient = LinearGradient(
-    colors: [accentOrange, accentPink],
+    colors: [Color(0xFFF97316), lime],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
 
   // Dark theme specific gradients
   static const LinearGradient darkSurfaceGradient = LinearGradient(
-    colors: [Color(0xFF1A1A24), Color(0xFF141420)],
+    colors: [panel, ink2],
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
   );
 
   static const LinearGradient darkCardGradient = LinearGradient(
-    colors: [Color(0xFF22222E), Color(0xFF1A1A24)],
+    colors: [panelElevated, panel],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
 
-  // Glow colors for dark theme
-  static Color glowPurple = accentPurple.withValues(alpha: 0.3);
-  static Color glowPink = accentPink.withValues(alpha: 0.3);
-  static Color glowBlue = accentBlue.withValues(alpha: 0.3);
+  // Glow colors
+  static Color glowPurple = lime.withValues(alpha: 0.3);
+  static Color glowPink = lime.withValues(alpha: 0.22);
+  static Color glowBlue = green.withValues(alpha: 0.25);
 
   static TextTheme _buildTextTheme(Color primaryColor, Color secondaryColor) {
     return TextTheme(
-      displayLarge: GoogleFonts.inter(
+      displayLarge: GoogleFonts.spaceGrotesk(
         color: primaryColor,
         fontSize: 32,
-        fontWeight: FontWeight.w800,
+        fontWeight: FontWeight.w700,
         letterSpacing: -0.5,
       ),
-      displayMedium: GoogleFonts.inter(
+      displayMedium: GoogleFonts.spaceGrotesk(
         color: primaryColor,
         fontSize: 26,
         fontWeight: FontWeight.w700,
         letterSpacing: -0.5,
       ),
-      titleLarge: GoogleFonts.inter(
+      titleLarge: GoogleFonts.spaceGrotesk(
         color: primaryColor,
         fontSize: 22,
         fontWeight: FontWeight.w700,
       ),
-      titleMedium: GoogleFonts.inter(
+      titleMedium: GoogleFonts.spaceGrotesk(
         color: primaryColor,
         fontSize: 18,
         fontWeight: FontWeight.w600,
@@ -261,8 +289,8 @@ class NotionTheme {
       scaffoldBackgroundColor: darkBackground,
       colorScheme: const ColorScheme.dark(
         primary: accentPurple,
-        onPrimary: Colors.white,
-        primaryContainer: Color(0xFF2D2250),
+        onPrimary: ink,
+        primaryContainer: Color(0xFF1F2E12),
         surface: darkSurface,
         surfaceContainerHighest: darkSurfaceElevated,
         onSurface: darkTextPrimary,
@@ -318,9 +346,9 @@ class NotionTheme {
             if (states.contains(WidgetState.disabled)) {
               return darkTextMuted;
             }
-            return Colors.white;
+            return ink;
           }),
-          overlayColor: WidgetStateProperty.all(Colors.white.withValues(alpha: 0.1)),
+          overlayColor: WidgetStateProperty.all(ink.withValues(alpha: 0.12)),
           elevation: WidgetStateProperty.all(0),
           shadowColor: WidgetStateProperty.all(accentPurple.withValues(alpha: 0.4)),
           padding: WidgetStateProperty.all(
@@ -411,7 +439,7 @@ class NotionTheme {
       ),
       floatingActionButtonTheme: FloatingActionButtonThemeData(
         backgroundColor: accentPurple,
-        foregroundColor: Colors.white,
+        foregroundColor: ink,
         elevation: 8,
         focusElevation: 12,
         hoverElevation: 10,
@@ -542,8 +570,8 @@ class NotionTheme {
       ),
       progressIndicatorTheme: const ProgressIndicatorThemeData(
         color: accentPurple,
-        circularTrackColor: Color(0xFF2D2250),
-        linearTrackColor: Color(0xFF2D2250),
+        circularTrackColor: Color(0xFF1F2E12),
+        linearTrackColor: Color(0xFF1F2E12),
       ),
       switchTheme: SwitchThemeData(
         thumbColor: WidgetStateProperty.resolveWith((states) {

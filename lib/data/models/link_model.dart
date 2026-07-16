@@ -3,6 +3,7 @@ import '../../domain/entities/link.dart';
 import '../../domain/entities/platform_type.dart';
 import '../../domain/entities/topic_type.dart';
 import '../../domain/entities/content_type.dart';
+import '../../domain/entities/sync_types.dart';
 
 part 'link_model.g.dart';
 
@@ -14,6 +15,7 @@ class LinkModel {
   late String title;
   String? description;
   String? imageUrl;
+  String? faviconUrl;
   String? publisherName;
   String? aiDescription;
 
@@ -32,6 +34,27 @@ class LinkModel {
 
   int? customCategoryId;
 
+  // Sync fields (server = Supabase content_items)
+  @Index(unique: false)
+  String? remoteId;
+
+  DateTime? updatedAt;
+
+  @enumerated
+  PendingOp pendingOp = PendingOp.none;
+
+  String? summary;
+  List<String> keyPoints = [];
+  String? topicLabel;
+
+  @enumerated
+  ItemStatus status = ItemStatus.ready;
+
+  String readStatus = 'unread';
+  bool isStarred = false;
+  bool isPinned = false;
+  List<String> folderRemoteIds = [];
+
   Link toEntity() {
     return Link(
       id: id,
@@ -39,6 +62,7 @@ class LinkModel {
       title: title,
       description: description,
       imageUrl: imageUrl,
+      faviconUrl: faviconUrl,
       publisherName: publisherName,
       aiDescription: aiDescription,
       platform: platform,
@@ -47,6 +71,17 @@ class LinkModel {
       tags: tags,
       createdAt: createdAt,
       customCategoryId: customCategoryId,
+      remoteId: remoteId,
+      updatedAt: updatedAt,
+      pendingOp: pendingOp,
+      summary: summary,
+      keyPoints: keyPoints,
+      topicLabel: topicLabel,
+      status: status,
+      readStatus: readStatus,
+      isStarred: isStarred,
+      isPinned: isPinned,
+      folderRemoteIds: folderRemoteIds,
     );
   }
 
@@ -57,6 +92,7 @@ class LinkModel {
       ..title = link.title
       ..description = link.description
       ..imageUrl = link.imageUrl
+      ..faviconUrl = link.faviconUrl
       ..publisherName = link.publisherName
       ..aiDescription = link.aiDescription
       ..platform = link.platform
@@ -64,6 +100,17 @@ class LinkModel {
       ..contentType = link.contentType
       ..tags = link.tags
       ..createdAt = link.createdAt
-      ..customCategoryId = link.customCategoryId;
+      ..customCategoryId = link.customCategoryId
+      ..remoteId = link.remoteId
+      ..updatedAt = link.updatedAt
+      ..pendingOp = link.pendingOp
+      ..summary = link.summary
+      ..keyPoints = link.keyPoints
+      ..topicLabel = link.topicLabel
+      ..status = link.status
+      ..readStatus = link.readStatus
+      ..isStarred = link.isStarred
+      ..isPinned = link.isPinned
+      ..folderRemoteIds = link.folderRemoteIds;
   }
 }
