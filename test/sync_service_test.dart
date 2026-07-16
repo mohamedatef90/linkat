@@ -26,6 +26,11 @@ class FakeLocalStore implements SyncLocalStore {
       rows.values.where((l) => l.pendingOp != PendingOp.none).toList();
 
   @override
+  Future<List<Link>> getLocalOnly() async => rows.values
+      .where((l) => l.remoteId == null && l.pendingOp == PendingOp.none)
+      .toList();
+
+  @override
   Future<Link> put(Link link) async {
     final id = link.id ?? _nextId++;
     final saved = link.copyWith(id: id);

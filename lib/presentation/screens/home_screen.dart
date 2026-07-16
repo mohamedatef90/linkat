@@ -12,8 +12,8 @@ import '../providers/auth_providers.dart';
 import '../providers/link_providers.dart';
 import '../providers/sync_providers.dart';
 import '../theme/notion_theme.dart';
-import '../providers/theme_provider.dart';
 import '../widgets/status_chip.dart';
+import '../widgets/magic/magic.dart';
 import 'folder_items_screen.dart';
 import 'manage_folders_screen.dart';
 import 'tags_screen.dart';
@@ -210,6 +210,55 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     });
   }
 
+  bool _syncingAll = false;
+
+  /// "Sync all links": uploads every local link that never reached the
+  /// database (old links saved before sync existed), then does a full sync.
+  Future<void> _syncAllLinks() async {
+    if (_syncingAll) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Sync all links?'),
+        content: const Text(
+            'Uploads any links on this device that are missing from your '
+            'cloud vault, then refreshes everything.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Sync All'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    setState(() => _syncingAll = true);
+    try {
+      final queued =
+          await ref.read(syncControllerProvider).syncAllLinks();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(queued == 0
+              ? 'All links are already in your cloud vault.'
+              : 'Uploaded $queued link${queued == 1 ? '' : 's'} to your vault.'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Sync failed: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _syncingAll = false);
+    }
+  }
+
   Future<void> _signOut() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -248,40 +297,50 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         isDarkMode ? NotionTheme.darkSurface : Colors.white;
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: NotionTheme.ink,
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        backgroundColor: theme.scaffoldBackgroundColor,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         title: Text(
-          'Linkat',
+          'RefVault',
           style: theme.textTheme.titleLarge?.copyWith(
             fontWeight: FontWeight.bold,
           ),
         ),
         actions: [
           IconButton(
-            icon: Icon(
-              _getThemeIcon(ref.watch(themeModeProvider)),
-              color: textColor,
-            ),
-            onPressed: () {
-              ref.read(themeModeProvider.notifier).toggleTheme();
-            },
-            tooltip: _getThemeTooltip(ref.watch(themeModeProvider)),
+            icon: _syncingAll
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: NotionTheme.fog2),
+                  )
+                : const Icon(Icons.cloud_upload_outlined,
+                    color: NotionTheme.fog2),
+            onPressed: _syncAllLinks,
+            tooltip: 'Sync all links to database',
           ),
           IconButton(
-            icon: Icon(Icons.logout, color: textColor),
+            icon: const Icon(Icons.logout, color: NotionTheme.fog2),
             onPressed: _signOut,
             tooltip: 'Sign out',
           ),
         ],
       ),
-      body: RefreshIndicator(
+      body: AuraBackground(
+        child: RefreshIndicator(
         onRefresh: () => ref.read(syncControllerProvider).syncNow(),
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+            padding: EdgeInsets.fromLTRB(
+              16,
+              MediaQuery.of(context).padding.top + kToolbarHeight + 8,
+              16,
+              100,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -297,16 +356,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 // Search Bar
                 Container(
                   decoration: BoxDecoration(
-                    color: itemBackgroundColor,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: borderColor),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 10,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
+                    color: NotionTheme.panel.withValues(alpha: 0.55),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: NotionTheme.borderSoft),
                   ),
                   child: TextField(
                     controller: _searchController,
@@ -396,65 +448,35 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
                 const SizedBox(height: 24),
 
-                Text(
-                  'PLATFORMS',
-                  style:
-                      theme.textTheme.labelSmall?.copyWith(letterSpacing: 1.2),
-                ),
+                const Eyebrow('Platforms'),
                 const SizedBox(height: 12),
 
-                Container(
-                  decoration: BoxDecoration(
-                    color: itemBackgroundColor,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: borderColor),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 10,
-                        offset: const Offset(0, 2),
-                      ),
+                GlassCard(
+                  padding: EdgeInsets.zero,
+                  child: Column(
+                    children: [
+                      for (int i = 0; i < PlatformType.values.length; i++) ...[
+                        if (i > 0) Divider(height: 1, color: borderColor),
+                        Reveal(
+                          delay: Duration(milliseconds: 40 * i),
+                          child: _PlatformRow(
+                            platform: PlatformType.values[i],
+                            textColor: textColor,
+                            subtextColor: subtextColor,
+                          ),
+                        ),
+                      ],
                     ],
-                  ),
-                  child: ListView.separated(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: PlatformType.values.length,
-                    separatorBuilder: (context, index) =>
-                        Divider(height: 1, color: borderColor),
-                    itemBuilder: (context, index) {
-                      final platform = PlatformType.values[index];
-                      return _PlatformRow(
-                        platform: platform,
-                        textColor: textColor,
-                        subtextColor: subtextColor,
-                      );
-                    },
                   ),
                 ),
 
                 const SizedBox(height: 32),
 
-                Text(
-                  'BROWSE',
-                  style:
-                      theme.textTheme.labelSmall?.copyWith(letterSpacing: 1.2),
-                ),
+                const Eyebrow('Browse'),
                 const SizedBox(height: 12),
 
-                Container(
-                  decoration: BoxDecoration(
-                    color: itemBackgroundColor,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: borderColor),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 10,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
+                GlassCard(
+                  padding: EdgeInsets.zero,
                   child: Column(
                     children: [
                       _BrowseRow(
@@ -507,11 +529,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             ),
           ),
         ),
-      ),
+      )),
       floatingActionButton: FloatingActionButton(
         onPressed: () => context.push('/add'),
-        backgroundColor: theme.floatingActionButtonTheme.backgroundColor,
-        foregroundColor: theme.colorScheme.onPrimary,
         child: const Icon(Icons.add),
       ),
     );
@@ -538,13 +558,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 const SizedBox(height: 32),
                 Row(
                   children: [
-                    Text(
-                      'FOLDERS',
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        letterSpacing: 1.2,
-                        color: subtextColor,
-                      ),
-                    ),
+                    const Eyebrow('Folders'),
                     const Spacer(),
                     GestureDetector(
                       onTap: () {
@@ -565,19 +579,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   ],
                 ),
                 const SizedBox(height: 12),
-                Container(
-                  decoration: BoxDecoration(
-                    color: itemBackgroundColor,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: borderColor),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 10,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
+                GlassCard(
+                  padding: EdgeInsets.zero,
                   child: Column(
                     children: [
                       for (int i = 0; i < folders.length; i++) ...[
@@ -601,27 +604,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     );
   }
 
-  IconData _getThemeIcon(ThemeMode mode) {
-    switch (mode) {
-      case ThemeMode.light:
-        return Icons.light_mode;
-      case ThemeMode.dark:
-        return Icons.dark_mode;
-      case ThemeMode.system:
-        return Icons.brightness_auto;
-    }
-  }
-
-  String _getThemeTooltip(ThemeMode mode) {
-    switch (mode) {
-      case ThemeMode.light:
-        return 'Light mode (tap for dark)';
-      case ThemeMode.dark:
-        return 'Dark mode (tap for auto)';
-      case ThemeMode.system:
-        return 'Auto mode (tap for light)';
-    }
-  }
 }
 
 class _BrowseRow extends StatelessWidget {
@@ -747,13 +729,13 @@ class _PlatformRow extends ConsumerWidget {
       case PlatformType.instagram:
         return const Color(0xFFE4405F);
       case PlatformType.twitter:
-        return const Color(0xFF000000);
+        return NotionTheme.white; // X's black mark is invisible on navy
       case PlatformType.youtube:
         return const Color(0xFFFF0000);
       case PlatformType.linkedin:
-        return const Color(0xFF0A66C2);
+        return const Color(0xFF3B82F6); // lifted for dark-bg contrast
       case PlatformType.other:
-        return NotionTheme.textGray;
+        return NotionTheme.fog2;
     }
   }
 }

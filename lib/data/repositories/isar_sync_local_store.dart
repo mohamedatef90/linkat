@@ -46,6 +46,17 @@ class IsarSyncLocalStore implements SyncLocalStore {
   }
 
   @override
+  Future<List<Link>> getLocalOnly() async {
+    final isar = await db;
+    final models = await isar.linkModels
+        .filter()
+        .remoteIdIsNull()
+        .pendingOpEqualTo(PendingOp.none)
+        .findAll();
+    return models.map((m) => m.toEntity()).toList();
+  }
+
+  @override
   Future<List<Link>> getPendingOps() async {
     final isar = await db;
     final models = await isar.linkModels

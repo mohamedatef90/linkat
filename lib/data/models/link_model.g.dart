@@ -43,97 +43,102 @@ const LinkModelSchema = CollectionSchema(
       name: r'description',
       type: IsarType.string,
     ),
-    r'folderRemoteIds': PropertySchema(
+    r'faviconUrl': PropertySchema(
       id: 5,
+      name: r'faviconUrl',
+      type: IsarType.string,
+    ),
+    r'folderRemoteIds': PropertySchema(
+      id: 6,
       name: r'folderRemoteIds',
       type: IsarType.stringList,
     ),
     r'imageUrl': PropertySchema(
-      id: 6,
+      id: 7,
       name: r'imageUrl',
       type: IsarType.string,
     ),
     r'isPinned': PropertySchema(
-      id: 7,
+      id: 8,
       name: r'isPinned',
       type: IsarType.bool,
     ),
     r'isStarred': PropertySchema(
-      id: 8,
+      id: 9,
       name: r'isStarred',
       type: IsarType.bool,
     ),
     r'keyPoints': PropertySchema(
-      id: 9,
+      id: 10,
       name: r'keyPoints',
       type: IsarType.stringList,
     ),
     r'pendingOp': PropertySchema(
-      id: 10,
+      id: 11,
       name: r'pendingOp',
       type: IsarType.byte,
       enumMap: _LinkModelpendingOpEnumValueMap,
     ),
     r'platform': PropertySchema(
-      id: 11,
+      id: 12,
       name: r'platform',
       type: IsarType.byte,
       enumMap: _LinkModelplatformEnumValueMap,
     ),
     r'publisherName': PropertySchema(
-      id: 12,
+      id: 13,
       name: r'publisherName',
       type: IsarType.string,
     ),
     r'readStatus': PropertySchema(
-      id: 13,
+      id: 14,
       name: r'readStatus',
       type: IsarType.string,
     ),
     r'remoteId': PropertySchema(
-      id: 14,
+      id: 15,
       name: r'remoteId',
       type: IsarType.string,
     ),
     r'status': PropertySchema(
-      id: 15,
+      id: 16,
       name: r'status',
       type: IsarType.byte,
       enumMap: _LinkModelstatusEnumValueMap,
     ),
     r'summary': PropertySchema(
-      id: 16,
+      id: 17,
       name: r'summary',
       type: IsarType.string,
     ),
     r'tags': PropertySchema(
-      id: 17,
+      id: 18,
       name: r'tags',
       type: IsarType.stringList,
     ),
     r'title': PropertySchema(
-      id: 18,
+      id: 19,
       name: r'title',
       type: IsarType.string,
     ),
     r'topic': PropertySchema(
-      id: 19,
+      id: 20,
       name: r'topic',
       type: IsarType.byte,
       enumMap: _LinkModeltopicEnumValueMap,
     ),
     r'topicLabel': PropertySchema(
-      id: 20,
+      id: 21,
       name: r'topicLabel',
       type: IsarType.string,
     ),
     r'updatedAt': PropertySchema(
-      id: 21,
+      id: 22,
       name: r'updatedAt',
       type: IsarType.dateTime,
     ),
     r'url': PropertySchema(
-      id: 22,
+      id: 23,
       name: r'url',
       type: IsarType.string,
     )
@@ -180,6 +185,12 @@ int _linkModelEstimateSize(
   }
   {
     final value = object.description;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
+  {
+    final value = object.faviconUrl;
     if (value != null) {
       bytesCount += 3 + value.length * 3;
     }
@@ -252,24 +263,25 @@ void _linkModelSerialize(
   writer.writeDateTime(offsets[2], object.createdAt);
   writer.writeLong(offsets[3], object.customCategoryId);
   writer.writeString(offsets[4], object.description);
-  writer.writeStringList(offsets[5], object.folderRemoteIds);
-  writer.writeString(offsets[6], object.imageUrl);
-  writer.writeBool(offsets[7], object.isPinned);
-  writer.writeBool(offsets[8], object.isStarred);
-  writer.writeStringList(offsets[9], object.keyPoints);
-  writer.writeByte(offsets[10], object.pendingOp.index);
-  writer.writeByte(offsets[11], object.platform.index);
-  writer.writeString(offsets[12], object.publisherName);
-  writer.writeString(offsets[13], object.readStatus);
-  writer.writeString(offsets[14], object.remoteId);
-  writer.writeByte(offsets[15], object.status.index);
-  writer.writeString(offsets[16], object.summary);
-  writer.writeStringList(offsets[17], object.tags);
-  writer.writeString(offsets[18], object.title);
-  writer.writeByte(offsets[19], object.topic.index);
-  writer.writeString(offsets[20], object.topicLabel);
-  writer.writeDateTime(offsets[21], object.updatedAt);
-  writer.writeString(offsets[22], object.url);
+  writer.writeString(offsets[5], object.faviconUrl);
+  writer.writeStringList(offsets[6], object.folderRemoteIds);
+  writer.writeString(offsets[7], object.imageUrl);
+  writer.writeBool(offsets[8], object.isPinned);
+  writer.writeBool(offsets[9], object.isStarred);
+  writer.writeStringList(offsets[10], object.keyPoints);
+  writer.writeByte(offsets[11], object.pendingOp.index);
+  writer.writeByte(offsets[12], object.platform.index);
+  writer.writeString(offsets[13], object.publisherName);
+  writer.writeString(offsets[14], object.readStatus);
+  writer.writeString(offsets[15], object.remoteId);
+  writer.writeByte(offsets[16], object.status.index);
+  writer.writeString(offsets[17], object.summary);
+  writer.writeStringList(offsets[18], object.tags);
+  writer.writeString(offsets[19], object.title);
+  writer.writeByte(offsets[20], object.topic.index);
+  writer.writeString(offsets[21], object.topicLabel);
+  writer.writeDateTime(offsets[22], object.updatedAt);
+  writer.writeString(offsets[23], object.url);
 }
 
 LinkModel _linkModelDeserialize(
@@ -286,33 +298,34 @@ LinkModel _linkModelDeserialize(
   object.createdAt = reader.readDateTime(offsets[2]);
   object.customCategoryId = reader.readLongOrNull(offsets[3]);
   object.description = reader.readStringOrNull(offsets[4]);
-  object.folderRemoteIds = reader.readStringList(offsets[5]) ?? [];
+  object.faviconUrl = reader.readStringOrNull(offsets[5]);
+  object.folderRemoteIds = reader.readStringList(offsets[6]) ?? [];
   object.id = id;
-  object.imageUrl = reader.readStringOrNull(offsets[6]);
-  object.isPinned = reader.readBool(offsets[7]);
-  object.isStarred = reader.readBool(offsets[8]);
-  object.keyPoints = reader.readStringList(offsets[9]) ?? [];
+  object.imageUrl = reader.readStringOrNull(offsets[7]);
+  object.isPinned = reader.readBool(offsets[8]);
+  object.isStarred = reader.readBool(offsets[9]);
+  object.keyPoints = reader.readStringList(offsets[10]) ?? [];
   object.pendingOp =
-      _LinkModelpendingOpValueEnumMap[reader.readByteOrNull(offsets[10])] ??
+      _LinkModelpendingOpValueEnumMap[reader.readByteOrNull(offsets[11])] ??
           PendingOp.none;
   object.platform =
-      _LinkModelplatformValueEnumMap[reader.readByteOrNull(offsets[11])] ??
+      _LinkModelplatformValueEnumMap[reader.readByteOrNull(offsets[12])] ??
           PlatformType.facebook;
-  object.publisherName = reader.readStringOrNull(offsets[12]);
-  object.readStatus = reader.readString(offsets[13]);
-  object.remoteId = reader.readStringOrNull(offsets[14]);
+  object.publisherName = reader.readStringOrNull(offsets[13]);
+  object.readStatus = reader.readString(offsets[14]);
+  object.remoteId = reader.readStringOrNull(offsets[15]);
   object.status =
-      _LinkModelstatusValueEnumMap[reader.readByteOrNull(offsets[15])] ??
+      _LinkModelstatusValueEnumMap[reader.readByteOrNull(offsets[16])] ??
           ItemStatus.pending;
-  object.summary = reader.readStringOrNull(offsets[16]);
-  object.tags = reader.readStringList(offsets[17]) ?? [];
-  object.title = reader.readString(offsets[18]);
+  object.summary = reader.readStringOrNull(offsets[17]);
+  object.tags = reader.readStringList(offsets[18]) ?? [];
+  object.title = reader.readString(offsets[19]);
   object.topic =
-      _LinkModeltopicValueEnumMap[reader.readByteOrNull(offsets[19])] ??
+      _LinkModeltopicValueEnumMap[reader.readByteOrNull(offsets[20])] ??
           TopicType.aiTech;
-  object.topicLabel = reader.readStringOrNull(offsets[20]);
-  object.updatedAt = reader.readDateTimeOrNull(offsets[21]);
-  object.url = reader.readString(offsets[22]);
+  object.topicLabel = reader.readStringOrNull(offsets[21]);
+  object.updatedAt = reader.readDateTimeOrNull(offsets[22]);
+  object.url = reader.readString(offsets[23]);
   return object;
 }
 
@@ -336,44 +349,46 @@ P _linkModelDeserializeProp<P>(
     case 4:
       return (reader.readStringOrNull(offset)) as P;
     case 5:
-      return (reader.readStringList(offset) ?? []) as P;
-    case 6:
       return (reader.readStringOrNull(offset)) as P;
+    case 6:
+      return (reader.readStringList(offset) ?? []) as P;
     case 7:
-      return (reader.readBool(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 8:
       return (reader.readBool(offset)) as P;
     case 9:
-      return (reader.readStringList(offset) ?? []) as P;
+      return (reader.readBool(offset)) as P;
     case 10:
+      return (reader.readStringList(offset) ?? []) as P;
+    case 11:
       return (_LinkModelpendingOpValueEnumMap[reader.readByteOrNull(offset)] ??
           PendingOp.none) as P;
-    case 11:
+    case 12:
       return (_LinkModelplatformValueEnumMap[reader.readByteOrNull(offset)] ??
           PlatformType.facebook) as P;
-    case 12:
-      return (reader.readStringOrNull(offset)) as P;
     case 13:
-      return (reader.readString(offset)) as P;
-    case 14:
       return (reader.readStringOrNull(offset)) as P;
+    case 14:
+      return (reader.readString(offset)) as P;
     case 15:
+      return (reader.readStringOrNull(offset)) as P;
+    case 16:
       return (_LinkModelstatusValueEnumMap[reader.readByteOrNull(offset)] ??
           ItemStatus.pending) as P;
-    case 16:
-      return (reader.readStringOrNull(offset)) as P;
     case 17:
-      return (reader.readStringList(offset) ?? []) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 18:
-      return (reader.readString(offset)) as P;
+      return (reader.readStringList(offset) ?? []) as P;
     case 19:
+      return (reader.readString(offset)) as P;
+    case 20:
       return (_LinkModeltopicValueEnumMap[reader.readByteOrNull(offset)] ??
           TopicType.aiTech) as P;
-    case 20:
-      return (reader.readStringOrNull(offset)) as P;
     case 21:
-      return (reader.readDateTimeOrNull(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 22:
+      return (reader.readDateTimeOrNull(offset)) as P;
+    case 23:
       return (reader.readString(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -1112,6 +1127,157 @@ extension LinkModelQueryFilter
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.greaterThan(
         property: r'description',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterFilterCondition> faviconUrlIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'faviconUrl',
+      ));
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterFilterCondition>
+      faviconUrlIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'faviconUrl',
+      ));
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterFilterCondition> faviconUrlEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'faviconUrl',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterFilterCondition>
+      faviconUrlGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'faviconUrl',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterFilterCondition> faviconUrlLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'faviconUrl',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterFilterCondition> faviconUrlBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'faviconUrl',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterFilterCondition>
+      faviconUrlStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'faviconUrl',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterFilterCondition> faviconUrlEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'faviconUrl',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterFilterCondition> faviconUrlContains(
+      String value,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'faviconUrl',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterFilterCondition> faviconUrlMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'faviconUrl',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterFilterCondition>
+      faviconUrlIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'faviconUrl',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterFilterCondition>
+      faviconUrlIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'faviconUrl',
         value: '',
       ));
     });
@@ -3355,6 +3521,18 @@ extension LinkModelQuerySortBy on QueryBuilder<LinkModel, LinkModel, QSortBy> {
     });
   }
 
+  QueryBuilder<LinkModel, LinkModel, QAfterSortBy> sortByFaviconUrl() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'faviconUrl', Sort.asc);
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterSortBy> sortByFaviconUrlDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'faviconUrl', Sort.desc);
+    });
+  }
+
   QueryBuilder<LinkModel, LinkModel, QAfterSortBy> sortByImageUrl() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'imageUrl', Sort.asc);
@@ -3599,6 +3777,18 @@ extension LinkModelQuerySortThenBy
     });
   }
 
+  QueryBuilder<LinkModel, LinkModel, QAfterSortBy> thenByFaviconUrl() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'faviconUrl', Sort.asc);
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterSortBy> thenByFaviconUrlDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'faviconUrl', Sort.desc);
+    });
+  }
+
   QueryBuilder<LinkModel, LinkModel, QAfterSortBy> thenById() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'id', Sort.asc);
@@ -3827,6 +4017,13 @@ extension LinkModelQueryWhereDistinct
     });
   }
 
+  QueryBuilder<LinkModel, LinkModel, QDistinct> distinctByFaviconUrl(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'faviconUrl', caseSensitive: caseSensitive);
+    });
+  }
+
   QueryBuilder<LinkModel, LinkModel, QDistinct> distinctByFolderRemoteIds() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'folderRemoteIds');
@@ -3980,6 +4177,12 @@ extension LinkModelQueryProperty
   QueryBuilder<LinkModel, String?, QQueryOperations> descriptionProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'description');
+    });
+  }
+
+  QueryBuilder<LinkModel, String?, QQueryOperations> faviconUrlProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'faviconUrl');
     });
   }
 

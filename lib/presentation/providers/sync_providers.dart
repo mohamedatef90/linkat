@@ -79,6 +79,15 @@ class SyncController {
     refreshLinkProviders();
   }
 
+  /// "Sync all links": queue every never-uploaded local row as a create, then
+  /// run a full push + pull. Returns how many old links were queued for upload.
+  Future<int> syncAllLinks() async {
+    final queued =
+        await _ref.read(syncServiceProvider).requeueLocalOnly();
+    await syncNow();
+    return queued;
+  }
+
   /// Save a URL through save-item with an instant local metadata preview.
   Future<Link> saveUrl(
     String url, {

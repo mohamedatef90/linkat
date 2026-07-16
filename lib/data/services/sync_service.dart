@@ -33,6 +33,10 @@ abstract class SyncLocalStore {
   Future<List<Link>> getAllSynced();
   Future<List<Link>> getPendingOps();
 
+  /// Rows that never reached the server AND aren't queued (remoteId == null,
+  /// pendingOp == none) — e.g. links saved before the sync engine existed.
+  Future<List<Link>> getLocalOnly();
+
   /// Insert or update; when [link.id] is set, the existing row is replaced.
   Future<Link> put(Link link);
   Future<void> deleteLocal(int id);
@@ -75,6 +79,18 @@ class SyncService {
     } catch (e) {
       debugPrint('SyncService: pull failed (probably offline): $e');
     }
+  }
+
+  /// Backfill for "Sync all links": local rows that never reached the server
+  /// (saved before the sync engine existed, or whose create was lost) are
+  /// re-queued as pending creates. Returns how many were queued; the caller
+  /// then runs [sync] to flush them through save-item.
+  Future<int> requeueLocalOnly() async {
+    final orphans = await local.getLocalOnly();
+    for (final link in orphans) {
+      await local.put(link.copyWith(pendingOp: PendingOp.create));
+    }
+    return orphans.length;
   }
 
   /// Flush all pending local ops to the server. A failing op is kept queued

@@ -15,6 +15,7 @@ class LinkModel {
   late String title;
   String? description;
   String? imageUrl;
+  String? faviconUrl;
   String? publisherName;
   String? aiDescription;
 
@@ -61,6 +62,7 @@ class LinkModel {
       title: title,
       description: description,
       imageUrl: imageUrl,
+      faviconUrl: faviconUrl,
       publisherName: publisherName,
       aiDescription: aiDescription,
       platform: platform,
@@ -90,6 +92,7 @@ class LinkModel {
       ..title = link.title
       ..description = link.description
       ..imageUrl = link.imageUrl
+      ..faviconUrl = link.faviconUrl
       ..publisherName = link.publisherName
       ..aiDescription = link.aiDescription
       ..platform = link.platform

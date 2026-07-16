@@ -71,6 +71,7 @@ class SupabaseDatasource implements SyncRemoteStore {
       'save-item',
       body: {
         'url': url,
+        'saved_via': 'mobile',
         if (folderId != null) 'folder_id': folderId,
       },
     );
@@ -173,6 +174,7 @@ class SupabaseDatasource implements SyncRemoteStore {
       title: row['title'] as String? ?? url,
       description: row['description'] as String?,
       imageUrl: row['thumbnail_url'] as String?,
+      faviconUrl: row['favicon_url'] as String?,
       publisherName: row['site_name'] as String?,
       aiDescription: row['summary'] as String?,
       platform: _platformDetection.detectPlatform(url),

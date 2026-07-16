@@ -9,6 +9,7 @@ class Link {
   final String title;
   final String? description;
   final String? imageUrl;
+  final String? faviconUrl;
   final String? publisherName;
   final String? aiDescription;
   final PlatformType platform;
@@ -37,6 +38,7 @@ class Link {
     required this.title,
     this.description,
     this.imageUrl,
+    this.faviconUrl,
     this.publisherName,
     this.aiDescription,
     required this.platform,
@@ -64,6 +66,7 @@ class Link {
     String? title,
     String? description,
     String? imageUrl,
+    String? faviconUrl,
     String? publisherName,
     String? aiDescription,
     PlatformType? platform,
@@ -90,6 +93,7 @@ class Link {
       title: title ?? this.title,
       description: description ?? this.description,
       imageUrl: imageUrl ?? this.imageUrl,
+      faviconUrl: faviconUrl ?? this.faviconUrl,
       publisherName: publisherName ?? this.publisherName,
       aiDescription: aiDescription ?? this.aiDescription,
       platform: platform ?? this.platform,
