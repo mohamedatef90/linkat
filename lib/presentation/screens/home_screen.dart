@@ -310,6 +310,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.rss_feed, color: NotionTheme.fog2),
+            onPressed: () => context.push('/feeds'),
+            tooltip: 'Feeds',
+          ),
+          IconButton(
             icon: _syncingAll
                 ? const SizedBox(
                     width: 18,

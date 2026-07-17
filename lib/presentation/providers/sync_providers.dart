@@ -182,6 +182,18 @@ final linksByFolderProvider =
   return all.where((l) => l.folderRemoteIds.contains(folderId)).toList();
 });
 
+// ---- feeds ----
+
+final feedsProvider = FutureProvider<List<RemoteFeed>>((ref) {
+  ref.watch(authStateChangesProvider);
+  return ref.watch(supabaseDatasourceProvider).fetchFeeds();
+});
+
+final freshFeedItemsProvider = FutureProvider<List<Link>>((ref) {
+  ref.watch(authStateChangesProvider);
+  return ref.watch(supabaseDatasourceProvider).fetchFreshFeedItems();
+});
+
 /// content_text is large; fetched only when the reader opens.
 final contentTextProvider =
     FutureProvider.family<String?, String>((ref, remoteId) {

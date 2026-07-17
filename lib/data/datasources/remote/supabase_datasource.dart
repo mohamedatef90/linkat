@@ -33,6 +33,58 @@ class RemoteFolder {
   }
 }
 
+/// A row from `rss_subscriptions`.
+class RemoteFeed {
+  final String id;
+  final String feedUrl;
+  final String? siteUrl;
+  final String? title;
+  final String? faviconUrl;
+  final DateTime? lastFetchedAt;
+  final bool isActive;
+  final int errorCount;
+  final String? lastError;
+
+  const RemoteFeed({
+    required this.id,
+    required this.feedUrl,
+    this.siteUrl,
+    this.title,
+    this.faviconUrl,
+    this.lastFetchedAt,
+    this.isActive = true,
+    this.errorCount = 0,
+    this.lastError,
+  });
+
+  factory RemoteFeed.fromJson(Map<String, dynamic> j) => RemoteFeed(
+        id: j['id'] as String,
+        feedUrl: j['feed_url'] as String? ?? '',
+        siteUrl: j['site_url'] as String?,
+        title: j['title'] as String?,
+        faviconUrl: j['favicon_url'] as String?,
+        lastFetchedAt: DateTime.tryParse(j['last_fetched_at'] as String? ?? ''),
+        isActive: j['is_active'] as bool? ?? true,
+        errorCount: (j['error_count'] as num?)?.toInt() ?? 0,
+        lastError: j['last_error'] as String?,
+      );
+}
+
+/// A discovered feed candidate from the `discover-feed` Edge Function.
+class FeedCandidate {
+  final String feedUrl;
+  final String? title;
+  final bool validated;
+
+  const FeedCandidate({required this.feedUrl, this.title, this.validated = false});
+
+  factory FeedCandidate.fromJson(Map<String, dynamic> j) => FeedCandidate(
+        feedUrl: j['feed_url'] as String,
+        title: j['title'] as String?,
+        validated: j['validated'] as bool? ?? false,
+      );
+}
+
 /// Result of the `translate` Edge Function.
 class TranslationResult {
   final String? title;
@@ -136,6 +188,70 @@ class SupabaseDatasource implements SyncRemoteStore {
               const <String>[],
       body: data['body'] as String?,
     );
+  }
+
+  // ---- feeds (RSS subscriptions) ----
+
+  Future<List<RemoteFeed>> fetchFeeds() async {
+    final rows = await _client
+        .from('rss_subscriptions')
+        .select('id, feed_url, site_url, title, favicon_url, last_fetched_at, is_active, error_count, last_error')
+        .order('created_at', ascending: false);
+    return (rows as List).map((r) => RemoteFeed.fromJson(r as Map<String, dynamic>)).toList();
+  }
+
+  /// Validate a feed URL / extract feed candidates from a site URL.
+  Future<List<FeedCandidate>> discoverFeed(String url) async {
+    final resp = await _client.functions.invoke('discover-feed', body: {'url': url});
+    final data = resp.data as Map<String, dynamic>;
+    final cands = (data['candidates'] as List?) ?? const [];
+    return cands.map((c) => FeedCandidate.fromJson(c as Map<String, dynamic>)).toList();
+  }
+
+  Future<RemoteFeed> subscribeFeed(FeedCandidate candidate) async {
+    String domain = '';
+    try { domain = Uri.parse(candidate.feedUrl).host; } catch (_) {}
+    final row = await _client
+        .from('rss_subscriptions')
+        .insert({
+          'user_id': _client.auth.currentUser!.id,
+          'feed_url': candidate.feedUrl,
+          'title': candidate.title,
+          'favicon_url': domain.isNotEmpty ? 'https://www.google.com/s2/favicons?domain=$domain&sz=64' : null,
+        })
+        .select('id, feed_url, site_url, title, favicon_url, last_fetched_at, is_active, error_count, last_error')
+        .single();
+    return RemoteFeed.fromJson(row);
+  }
+
+  Future<void> unsubscribeFeed(String id) async {
+    await _client.from('rss_subscriptions').delete().eq('id', id);
+  }
+
+  Future<void> setFeedActive(String id, bool active) async {
+    await _client.from('rss_subscriptions').update({
+      'is_active': active,
+      if (active) 'error_count': 0,
+      if (active) 'last_error': null,
+    }).eq('id', id);
+  }
+
+  /// Force-poll one subscription now (first fetch / manual sync).
+  Future<void> syncFeed(String id) async {
+    await _client.functions.invoke('rss-poller', body: {'subscription_id': id});
+  }
+
+  /// Items ingested from feeds in the last 48h (the "fresh" stream).
+  Future<List<Link>> fetchFreshFeedItems() async {
+    final since = DateTime.now().toUtc().subtract(const Duration(hours: 48)).toIso8601String();
+    final rows = await _client
+        .from('content_items')
+        .select('*, item_folders(folder_id)')
+        .eq('source_type', 'rss')
+        .gte('created_at', since)
+        .order('created_at', ascending: false)
+        .limit(50);
+    return (rows as List).map((r) => linkFromRow(r as Map<String, dynamic>)).toList();
   }
 
   // ---- folders ----

@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -117,6 +118,20 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
               ],
             ),
             const SizedBox(height: 16),
+
+            // Article / post / reel hero image.
+            if (link.imageUrl != null && link.imageUrl!.isNotEmpty) ...[
+              ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: CachedNetworkImage(
+                  imageUrl: link.imageUrl!,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  errorWidget: (_, __, ___) => const SizedBox.shrink(),
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
 
             // AI translation to Arabic (NVIDIA/Gemini, cached server-side).
             if (link.remoteId != null) ...[

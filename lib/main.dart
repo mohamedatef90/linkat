@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'presentation/screens/add_link_screen.dart';
 import 'presentation/screens/auth_screen.dart';
+import 'presentation/screens/feeds_screen.dart';
 import 'presentation/screens/folder_detail_screen.dart';
 import 'presentation/screens/home_screen.dart';
 import 'presentation/screens/splash_screen.dart';
@@ -78,6 +79,10 @@ final _router = GoRouter(
             final platform = state.pathParameters['platform']!;
             return FolderDetailScreen(platformName: platform);
           },
+        ),
+        GoRoute(
+          path: 'feeds',
+          builder: (context, state) => const FeedsScreen(),
         ),
       ],
     ),
