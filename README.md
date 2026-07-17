@@ -21,41 +21,27 @@
 
 ## Overview
 
-Linkat is a Flutter mobile app designed to help you save and organize links from various platforms. It automatically detects the platform (Facebook, Instagram, X/Twitter, YouTube, LinkedIn), categorizes content using AI, and generates smart descriptions to help you find your saved links later.
+Linkat is the **mobile client for RefVault** — an AI knowledge vault it shares with the [BentoLinks](https://github.com/mohamedatef90/bentolinks-ai) web app over one Supabase backend. Save a link from the iOS share sheet and it syncs to the cloud, where it's fetched, read, and **AI-enriched server-side** (title, summary, key points, topic, tags), then streamed back to your phone. Everything you save on your phone is also there on the web, and vice-versa.
+
+> **Note:** AI now runs **server-side** in Supabase Edge Functions (NVIDIA + Gemini), not on-device. The app just saves URLs and displays the enriched results; no AI key lives in the app.
 
 ## Features
 
-### Core Features
-- **Save Links Instantly** - Quick link saving with automatic metadata extraction
-- **iOS Share Extension** - Save links directly from any app using the iOS share sheet
-- **Platform Detection** - Automatic detection of social media platforms (Facebook, Instagram, X, YouTube, LinkedIn)
-- **Smart Thumbnails** - Automatically fetches and displays link previews with images
+### Core
+- **iOS Share Extension** — save links from any app via the share sheet; they upload to the cloud vault and enrich automatically.
+- **Cloud sync** — Supabase-backed, with an offline queue that flushes on reconnect and a **"Sync all links"** action to back-fill older local-only saves.
+- **Live updates** — items stream from `pending → parsing → enriching → ready` via Supabase Realtime.
 
-### AI-Powered Intelligence
-- **Auto-Categorization** - AI classifies links into 8 topic categories:
-  - AI & Tech
-  - Development
-  - Product & UX
-  - Design
-  - Business
-  - Science
-  - Entertainment
-  - Other
-- **Smart Tags** - AI generates relevant tags for easy searching
-- **AI Descriptions** - Generates concise summaries of linked content using Google Gemini
-- **AI Search** - Natural language search to find links semantically
+### AI-powered (server-side)
+- **Enrichment on everything** — every link gets an AI title, summary, key points, topic, and tags via a two-tier NVIDIA router (`gpt-oss-20b` / `glm-5.2`) with a Gemini fallback.
+- **Social & media fetching** — YouTube, X/Twitter, Reddit, PDF, and **Instagram / TikTok / Facebook** are scraped and transcribed on the backend (Apify + Gemini), so reels and posts get real content summaries.
+- **Reader** — full-screen reader with the article/post image, AI summary, key points, and a **Translate to Arabic** button (RTL).
 
-### Organization
-- **Platform Folders** - View links organized by social platform
-- **Topic Filtering** - Filter links by category/topic
-- **Tag System** - Browse and filter by auto-generated or custom tags
-- **Bulk Actions** - Assign topics to multiple links at once
-
-### Advanced Features
-- **Manual Override** - Add custom titles, descriptions, and tags
-- **Duplicate Detection** - Warns when saving duplicate links with replace/discard options
-- **Translation** - Translate AI summaries to 10+ languages
-- **Dark Mode Support** - Beautiful UI that respects system preferences
+### Organize & discover
+- **Folders (categories)** — bookmark rows show website favicons + AI summaries.
+- **Feeds** — subscribe to RSS/Atom feeds, manage sources (sync / pause / unsubscribe), and browse a "Fresh from your feeds" 48h stream.
+- **Platform folders, topics & tags** — browse by source, category, or auto-generated tags.
+- **Duplicate detection**, manual overrides, and a dark **magic_black** UI.
 
 ## Screenshots
 
@@ -94,14 +80,9 @@ Linkat is a Flutter mobile app designed to help you save and organize links from
    flutter pub run build_runner build --delete-conflicting-outputs
    ```
 
-4. **Configure environment variables**
+4. **Backend config**
 
-   Create a `.env` file in the project root:
-   ```
-   GEMINI_API_KEY=your_google_gemini_api_key_here
-   ```
-
-   > Note: The app works without the API key, but AI features will be disabled.
+   None needed to run — the Supabase URL and public anon key are set in `lib/main.dart`, and all AI/model keys live server-side in Supabase Vault. Just sign in and start saving.
 
 5. **Generate app icons**
    ```bash
@@ -166,13 +147,13 @@ In Xcode:
 
 ## Tech Stack
 
-- **Framework**: Flutter
+- **Framework**: Flutter (Dart 3)
 - **State Management**: Riverpod
-- **Local Database**: Isar
+- **Local Database**: Isar (offline cache + sync queue)
 - **Routing**: go_router
-- **AI/ML**: Google Gemini API
-- **HTTP**: http package
-- **HTML Parsing**: html package
+- **Backend**: Supabase (`supabase_flutter`) — Auth, Postgres (RLS), Edge Functions, Realtime
+- **AI/ML**: server-side (NVIDIA `gpt-oss-20b`/`glm-5.2` + Google Gemini) via RefVault Edge Functions — nothing runs on-device
+- **Media**: cached_network_image, url_launcher
 
 ## Architecture
 
@@ -201,11 +182,13 @@ lib/
 
 | Component | Description |
 |-----------|-------------|
-| `MetadataService` | Fetches OpenGraph metadata from URLs |
+| `SyncService` | Two-way cloud sync (server-wins): push queued local ops, pull server changes, back-fill local-only rows |
+| `SupabaseDatasource` | RefVault backend access — `save-item`/`translate`/`discover-feed`/`rss-poller` Edge Functions, content_items, folders, feeds, Realtime |
+| `MetadataService` | Fetches OpenGraph metadata for an instant local preview (server re-parses for the real data) |
 | `PlatformDetectionService` | Identifies social platforms from URLs |
-| `AiClassificationService` | AI-powered topic and tag generation |
-| `AiDescriptionService` | Generates link summaries |
-| `LinkRepository` | Isar database operations |
+| `LinkRepository` / `IsarSyncLocalStore` | Local Isar cache + sync queue |
+
+> Enrichment (title, summary, key points, tags), social scraping, translation, and search all happen **server-side** in Supabase Edge Functions — the app never calls an AI model directly.
 
 ## iOS Share Extension
 
@@ -216,11 +199,9 @@ Key points:
 - Both main app and extension must share the same App Group
 - Links shared via extension are processed when the main app opens
 
-## Environment Variables
+## Backend
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `GEMINI_API_KEY` | Google Gemini API key for AI features | Optional |
+Linkat talks to the shared **RefVault** Supabase project. The Supabase URL + public anon key are in `lib/main.dart`; access is enforced by Row-Level Security and Auth. All AI provider keys (NVIDIA, Gemini, Apify) are stored in Supabase Vault and used only by Edge Functions — **no secrets ship in the app**.
 
 ## Contributing
 
