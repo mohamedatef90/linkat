@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../data/datasources/remote/supabase_datasource.dart';
 import '../../domain/entities/link.dart';
 import '../providers/sync_providers.dart';
 import '../theme/notion_theme.dart';
@@ -9,10 +10,23 @@ import '../widgets/magic/magic.dart';
 
 /// Reading view for an enriched item: summary, key points, tags, and the
 /// full extracted text (fetched from the server when the screen opens).
-class ReaderScreen extends ConsumerWidget {
+class ReaderScreen extends ConsumerStatefulWidget {
   final Link link;
 
   const ReaderScreen({super.key, required this.link});
+
+  @override
+  ConsumerState<ReaderScreen> createState() => _ReaderScreenState();
+}
+
+class _ReaderScreenState extends ConsumerState<ReaderScreen> {
+  Link get link => widget.link;
+
+  // AI translation (Arabic) — fetched on demand, cached server-side.
+  TranslationResult? _translation;
+  bool _translating = false;
+  bool _showArabic = false;
+  String? _translateError;
 
   Future<void> _launchUrl(String url) async {
     final uri = Uri.parse(url.trim());
@@ -21,8 +35,36 @@ class ReaderScreen extends ConsumerWidget {
     }
   }
 
+  Future<void> _translate() async {
+    // Once fetched, the button just toggles Arabic on/off.
+    if (_translation != null) {
+      setState(() => _showArabic = !_showArabic);
+      return;
+    }
+    if (link.remoteId == null) return;
+    setState(() {
+      _translating = true;
+      _translateError = null;
+    });
+    try {
+      final result = await ref
+          .read(supabaseDatasourceProvider)
+          .translate(link.remoteId!, lang: 'ar');
+      if (!mounted) return;
+      setState(() {
+        _translation = result;
+        _showArabic = true;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _translateError = 'تعذّرت الترجمة · Translation failed');
+    } finally {
+      if (mounted) setState(() => _translating = false);
+    }
+  }
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final borderColor =
@@ -75,6 +117,42 @@ class ReaderScreen extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: 16),
+
+            // AI translation to Arabic (NVIDIA/Gemini, cached server-side).
+            if (link.remoteId != null) ...[
+              Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton.icon(
+                  onPressed: _translating ? null : _translate,
+                  icon: _translating
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Icon(Icons.translate,
+                          size: 16, color: theme.colorScheme.primary),
+                  label: Text(
+                    _translating
+                        ? 'Translating…'
+                        : _translation != null
+                            ? (_showArabic ? 'Show original' : 'اقرأ بالعربية')
+                            : 'ترجم للعربية · Translate to Arabic',
+                  ),
+                ),
+              ),
+              if (_translateError != null) ...[
+                const SizedBox(height: 8),
+                Text(_translateError!,
+                    style: theme.textTheme.bodySmall
+                        ?.copyWith(color: Colors.redAccent)),
+              ],
+              if (_showArabic && _translation != null) ...[
+                const SizedBox(height: 12),
+                _arabicCard(theme, surfaceColor, borderColor),
+              ],
+              const SizedBox(height: 16),
+            ],
 
             if (link.summary != null) ...[
               _sectionTitle(theme, Icons.auto_awesome, 'Summary',
@@ -184,6 +262,80 @@ class ReaderScreen extends ConsumerWidget {
           ],
         ),
       )),
+    );
+  }
+
+  /// The Arabic translation, laid out right-to-left.
+  Widget _arabicCard(ThemeData theme, Color surfaceColor, Color borderColor) {
+    final t = _translation!;
+    final primary = theme.colorScheme.primary;
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: surfaceColor,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: borderColor),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.translate, size: 16, color: primary),
+                const SizedBox(width: 6),
+                Text('الترجمة العربية',
+                    style: theme.textTheme.labelSmall
+                        ?.copyWith(fontWeight: FontWeight.w600, color: primary)),
+              ],
+            ),
+            const SizedBox(height: 10),
+            if (t.title != null && t.title!.isNotEmpty) ...[
+              Text(t.title!,
+                  style: theme.textTheme.titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w700, height: 1.5)),
+              const SizedBox(height: 8),
+            ],
+            if (t.summary != null && t.summary!.isNotEmpty) ...[
+              Text(t.summary!,
+                  style: theme.textTheme.bodyMedium?.copyWith(height: 1.7)),
+              const SizedBox(height: 12),
+            ],
+            ...t.keyPoints.map(
+              (point) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(top: 7),
+                      child: Container(
+                        width: 5,
+                        height: 5,
+                        decoration:
+                            BoxDecoration(color: primary, shape: BoxShape.circle),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(point,
+                          style:
+                              theme.textTheme.bodyMedium?.copyWith(height: 1.5)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            if (t.body != null && t.body!.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(t.body!,
+                  style: theme.textTheme.bodyMedium?.copyWith(height: 1.7)),
+            ],
+          ],
+        ),
+      ),
     );
   }
 

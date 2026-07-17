@@ -33,6 +33,21 @@ class RemoteFolder {
   }
 }
 
+/// Result of the `translate` Edge Function.
+class TranslationResult {
+  final String? title;
+  final String? summary;
+  final List<String> keyPoints;
+  final String? body;
+
+  const TranslationResult({
+    this.title,
+    this.summary,
+    this.keyPoints = const [],
+    this.body,
+  });
+}
+
 /// Remote data access for the RefVault Supabase backend
 /// (content_items / folders tables + save-item Edge Function).
 class SupabaseDatasource implements SyncRemoteStore {
@@ -102,6 +117,25 @@ class SupabaseDatasource implements SyncRemoteStore {
         .eq('id', remoteId)
         .maybeSingle();
     return row?['content_text'] as String?;
+  }
+
+  /// AI translation of the item's title/summary/key points/body via the
+  /// `translate` Edge Function (NVIDIA fast model + Gemini fallback, cached
+  /// server-side). Defaults to Arabic.
+  Future<TranslationResult> translate(String remoteId, {String lang = 'ar'}) async {
+    final response = await _client.functions.invoke(
+      'translate',
+      body: {'item_id': remoteId, 'target_lang': lang},
+    );
+    final data = response.data as Map<String, dynamic>;
+    return TranslationResult(
+      title: data['title'] as String?,
+      summary: data['summary'] as String?,
+      keyPoints:
+          (data['key_points'] as List?)?.map((e) => e.toString()).toList() ??
+              const <String>[],
+      body: data['body'] as String?,
+    );
   }
 
   // ---- folders ----
