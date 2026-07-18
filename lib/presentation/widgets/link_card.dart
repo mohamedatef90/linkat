@@ -1,12 +1,14 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../domain/entities/content_type.dart';
 import '../../domain/entities/link.dart';
+import '../../domain/entities/platform_type.dart';
 import '../../domain/entities/sync_types.dart';
 import '../providers/sync_providers.dart';
 import '../screens/reader_screen.dart';
@@ -202,39 +204,76 @@ class LinkCard extends ConsumerWidget {
     );
   }
 
+  /// Source badge: the platform's brand icon + name (Facebook / Instagram / X /
+  /// YouTube / LinkedIn). For non-social links it falls back to a doc/bookmark
+  /// icon with the content type or "Bookmark".
   Widget _kindBadge() {
-    // Content: icon-only book badge (the thumbnail type-badge already names the
-    // specific type — Article / Video / Reel…). Bookmark: icon + label, since
-    // bookmarks carry no type badge.
-    final content = _isContent;
-    final color = content ? NotionTheme.lime : NotionTheme.fog2;
+    final p = link.platform;
+    final color = _platformColor(p);
+    final label = p == PlatformType.other
+        ? (_isContent ? link.contentType.displayName : 'Bookmark')
+        : p.displayName;
     return Container(
-      padding:
-          EdgeInsets.symmetric(horizontal: content ? 5 : 7, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
+        color: color.withValues(alpha: 0.14),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(content ? Icons.menu_book_rounded : Icons.bookmark_border,
-              size: 11, color: color),
-          if (!content) ...[
-            const SizedBox(width: 4),
-            Text(
-              'Bookmark',
-              style: TextStyle(
-                color: color,
-                fontSize: 9,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.2,
-              ),
+          _platformIcon(p, color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 9,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.2,
             ),
-          ],
+          ),
         ],
       ),
     );
+  }
+
+  Widget _platformIcon(PlatformType p, Color color) {
+    switch (p) {
+      case PlatformType.facebook:
+        return FaIcon(FontAwesomeIcons.facebook, size: 11, color: color);
+      case PlatformType.instagram:
+        return FaIcon(FontAwesomeIcons.instagram, size: 11, color: color);
+      case PlatformType.twitter:
+        return FaIcon(FontAwesomeIcons.xTwitter, size: 11, color: color);
+      case PlatformType.youtube:
+        return FaIcon(FontAwesomeIcons.youtube, size: 11, color: color);
+      case PlatformType.linkedin:
+        return FaIcon(FontAwesomeIcons.linkedin, size: 11, color: color);
+      case PlatformType.other:
+        return Icon(
+          _isContent ? Icons.article_outlined : Icons.bookmark_border,
+          size: 12,
+          color: color,
+        );
+    }
+  }
+
+  static Color _platformColor(PlatformType p) {
+    switch (p) {
+      case PlatformType.facebook:
+        return const Color(0xFF1877F2);
+      case PlatformType.instagram:
+        return const Color(0xFFE4405F);
+      case PlatformType.twitter:
+        return NotionTheme.white; // X's black mark is invisible on navy
+      case PlatformType.youtube:
+        return const Color(0xFFFF0000);
+      case PlatformType.linkedin:
+        return const Color(0xFF3B82F6);
+      case PlatformType.other:
+        return NotionTheme.fog2;
+    }
   }
 
   Widget _footer(BuildContext context, WidgetRef ref, ThemeData theme) {
