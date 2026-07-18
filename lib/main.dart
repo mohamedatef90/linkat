@@ -7,9 +7,12 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'presentation/screens/add_link_screen.dart';
 import 'presentation/screens/auth_screen.dart';
 import 'presentation/screens/feeds_screen.dart';
-import 'presentation/screens/folder_detail_screen.dart';
-import 'presentation/screens/home_screen.dart';
+import 'presentation/screens/item_detail_loader.dart';
+import 'presentation/screens/library_screen.dart';
+import 'presentation/screens/settings_screen.dart';
 import 'presentation/screens/splash_screen.dart';
+import 'presentation/screens/vault_hub_screen.dart';
+import 'presentation/shell/app_shell.dart';
 import 'presentation/theme/notion_theme.dart';
 
 /// RefVault backend (shared with the web app). The anon key is public by
@@ -41,7 +44,10 @@ class GoRouterRefreshStream extends ChangeNotifier {
   }
 }
 
+final _rootNavigatorKey = GlobalKey<NavigatorState>();
+
 final _router = GoRouter(
+  navigatorKey: _rootNavigatorKey,
   initialLocation: '/splash',
   refreshListenable:
       GoRouterRefreshStream(Supabase.instance.client.auth.onAuthStateChange),
@@ -62,27 +68,58 @@ final _router = GoRouter(
       path: '/auth',
       builder: (context, state) => const AuthScreen(),
     ),
+    // Full-screen routes above the shell (no bottom nav).
     GoRoute(
-      path: '/',
-      builder: (context, state) => const HomeScreen(),
-      routes: [
-        GoRoute(
-          path: 'add',
-          builder: (context, state) {
-            final url = state.uri.queryParameters['url'];
-            return AddLinkScreen(initialUrl: url);
-          },
+      path: '/add',
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (context, state) =>
+          AddLinkScreen(initialUrl: state.uri.queryParameters['url']),
+    ),
+    GoRoute(
+      path: '/item/:id',
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (context, state) =>
+          ItemDetailLoader(remoteId: state.pathParameters['id']!),
+    ),
+    // The four main tabs, each with its own navigation stack.
+    StatefulShellRoute.indexedStack(
+      builder: (context, state, navigationShell) =>
+          AppShell(navigationShell: navigationShell),
+      branches: [
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/',
+              builder: (context, state) => const VaultHubScreen(),
+            ),
+          ],
         ),
-        GoRoute(
-          path: 'folder/:platform',
-          builder: (context, state) {
-            final platform = state.pathParameters['platform']!;
-            return FolderDetailScreen(platformName: platform);
-          },
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/library',
+              builder: (context, state) => LibraryScreen(
+                initialKind: state.uri.queryParameters['kind'],
+                initialStatus: state.uri.queryParameters['status'],
+              ),
+            ),
+          ],
         ),
-        GoRoute(
-          path: 'feeds',
-          builder: (context, state) => const FeedsScreen(),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/feeds',
+              builder: (context, state) => const FeedsScreen(),
+            ),
+          ],
+        ),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/settings',
+              builder: (context, state) => const SettingsScreen(),
+            ),
+          ],
         ),
       ],
     ),

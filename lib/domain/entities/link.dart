@@ -32,6 +32,17 @@ class Link {
   final bool isPinned;
   final List<String> folderRemoteIds;
 
+  /// 'bookmark' (plain website link) or 'content' (readable article/video/
+  /// post/PDF) — server-generated column, drives the Vault Hub vs Library
+  /// split just like the web app.
+  final String itemKind;
+
+  /// Client that saved the item: web / mobile / extension / import / rss / mcp.
+  final String? savedVia;
+
+  /// Original publish date of the source content, when known.
+  final DateTime? publishedAt;
+
   Link({
     this.id,
     required this.url,
@@ -58,6 +69,9 @@ class Link {
     this.isStarred = false,
     this.isPinned = false,
     this.folderRemoteIds = const [],
+    this.itemKind = 'bookmark',
+    this.savedVia,
+    this.publishedAt,
   });
 
   Link copyWith({
@@ -86,6 +100,9 @@ class Link {
     bool? isStarred,
     bool? isPinned,
     List<String>? folderRemoteIds,
+    String? itemKind,
+    String? savedVia,
+    DateTime? publishedAt,
   }) {
     return Link(
       id: id ?? this.id,
@@ -113,6 +130,9 @@ class Link {
       isStarred: isStarred ?? this.isStarred,
       isPinned: isPinned ?? this.isPinned,
       folderRemoteIds: folderRemoteIds ?? this.folderRemoteIds,
+      itemKind: itemKind ?? this.itemKind,
+      savedVia: savedVia ?? this.savedVia,
+      publishedAt: publishedAt ?? this.publishedAt,
     );
   }
 }
