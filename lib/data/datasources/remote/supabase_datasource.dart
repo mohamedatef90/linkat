@@ -100,7 +100,7 @@ class TranslationResult {
   });
 }
 
-/// Remote data access for the RefVault Supabase backend
+/// Remote data access for the Qlip Supabase backend
 /// (content_items / folders tables + save-item Edge Function).
 class SupabaseDatasource implements SyncRemoteStore {
   final SupabaseClient _client;

@@ -106,7 +106,7 @@ class _VaultHubScreenState extends ConsumerState<VaultHubScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         title: Text(
-          'RefVault',
+          'Qlip',
           style: theme.textTheme.titleLarge?.copyWith(
             fontWeight: FontWeight.bold,
           ),

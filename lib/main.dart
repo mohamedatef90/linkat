@@ -15,7 +15,7 @@ import 'presentation/screens/vault_hub_screen.dart';
 import 'presentation/shell/app_shell.dart';
 import 'presentation/theme/notion_theme.dart';
 
-/// RefVault backend (shared with the web app). The anon key is public by
+/// Qlip backend (shared with the web app). The anon key is public by
 /// design — all access is enforced by RLS + auth.
 const supabaseUrl = 'https://sjskpjgepbvblojohtlr.supabase.co';
 const supabaseAnonKey =
@@ -133,7 +133,7 @@ class LinkatApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // Dark-only magic_black design language.
     return MaterialApp.router(
-      title: 'Linkat',
+      title: 'Qlip',
       theme: NotionTheme.darkTheme,
       darkTheme: NotionTheme.darkTheme,
       themeMode: ThemeMode.dark,
