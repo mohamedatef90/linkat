@@ -17,10 +17,11 @@ abstract class ILinkRepository {
   Future<Link?> findByUrl(String url);
 
   // Vault Hub / Library queries (local-first over synced rows)
-  Future<int> countByKind(String kind);
+  Future<int> countByKind(String kind, {bool excludeMobile = false});
   Future<int> countUnread();
   Future<List<Link>> continueReading({int limit = 10});
-  Future<List<Link>> latestByKind(String kind, {int limit = 10});
+  Future<List<Link>> latestByKind(String kind,
+      {int limit = 10, bool excludeMobile = false});
   Future<List<Link>> pinned();
   Future<List<Link>> queryLibrary(LibraryFilter filter);
 

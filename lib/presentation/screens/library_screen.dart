@@ -28,6 +28,9 @@ class LibraryScreen extends ConsumerStatefulWidget {
 class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   late LibraryFilter _filter;
 
+  /// Platforms whose Mobile-tab section is expanded past the 10-item cap.
+  final Set<PlatformType> _expandedPlatforms = {};
+
   @override
   void initState() {
     super.initState();
@@ -187,16 +190,30 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
             child: _emptyState(theme),
           );
         }
+        const perPlatform = 10;
         final sections = <Widget>[];
         for (final platform in PlatformType.values) {
           final group =
               links.where((l) => l.platform == platform).toList();
           if (group.isEmpty) continue;
+          final expanded = _expandedPlatforms.contains(platform);
+          final shown = expanded ? group : group.take(perPlatform).toList();
           sections.add(_platformHeader(theme, platform, group.length));
-          for (final link in group) {
+          for (final link in shown) {
             sections.add(Padding(
               padding: const EdgeInsets.only(bottom: 10),
               child: LinkCard(link: link),
+            ));
+          }
+          if (group.length > perPlatform) {
+            sections.add(_seeMore(
+              expanded: expanded,
+              hidden: group.length - perPlatform,
+              onTap: () => setState(() {
+                expanded
+                    ? _expandedPlatforms.remove(platform)
+                    : _expandedPlatforms.add(platform);
+              }),
             ));
           }
           sections.add(const SizedBox(height: 12));
@@ -219,6 +236,37 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
         child: Center(
           child:
               Text('Could not load: $e', style: theme.textTheme.bodyMedium),
+        ),
+      ),
+    );
+  }
+
+  Widget _seeMore({
+    required bool expanded,
+    required int hidden,
+    required VoidCallback onTap,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 11),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: NotionTheme.panel.withValues(alpha: 0.4),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: NotionTheme.borderSoft),
+          ),
+          child: Text(
+            expanded ? 'Show less' : 'See more ($hidden)',
+            style: const TextStyle(
+              color: NotionTheme.lime,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
         ),
       ),
     );

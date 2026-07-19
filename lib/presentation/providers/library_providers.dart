@@ -16,7 +16,7 @@ final vaultCountsProvider = FutureProvider<VaultCounts>((ref) async {
   // Recompute whenever the link set changes (SyncController invalidates this).
   final repo = ref.watch(linkRepositoryProvider);
   final results = await Future.wait([
-    repo.countByKind('bookmark'),
+    repo.countByKind('bookmark', excludeMobile: true),
     repo.countByKind('content'),
     repo.countUnread(),
   ]);
@@ -32,7 +32,9 @@ final latestContentProvider = FutureProvider<List<Link>>((ref) {
 });
 
 final latestBookmarksProvider = FutureProvider<List<Link>>((ref) {
-  return ref.watch(linkRepositoryProvider).latestByKind('bookmark', limit: 12);
+  return ref
+      .watch(linkRepositoryProvider)
+      .latestByKind('bookmark', limit: 12, excludeMobile: true);
 });
 
 final pinnedLinksProvider = FutureProvider<List<Link>>((ref) {

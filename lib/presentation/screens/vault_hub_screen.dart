@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../domain/entities/library_filter.dart';
 import '../../domain/entities/link.dart';
+import '../../domain/entities/platform_type.dart';
 import '../providers/auth_providers.dart';
 import '../providers/library_providers.dart';
 import '../providers/link_providers.dart';
@@ -191,27 +192,43 @@ class _VaultHubScreenState extends ConsumerState<VaultHubScreen> {
 
   Widget _searchResultsSection(ThemeData theme) {
     final results = _searchResults;
-    return Padding(
-      padding: const EdgeInsets.only(top: 16),
-      child: (results == null)
-          ? const SizedBox.shrink()
-          : results.isEmpty
-              ? Padding(
-                  padding: const EdgeInsets.all(32),
-                  child: Center(
-                    child: Text('No results found',
-                        style: theme.textTheme.bodyMedium),
-                  ),
-                )
-              : Column(
-                  children: [
-                    for (final link in results)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: LinkCard(link: link),
-                      ),
-                  ],
-                ),
+    if (results == null) return const SizedBox.shrink();
+    if (results.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.all(32),
+        child: Center(
+          child: Text('No results found', style: theme.textTheme.bodyMedium),
+        ),
+      );
+    }
+    // Group results into per-source sections (Facebook / Instagram / X /
+    // YouTube / LinkedIn / Website).
+    final widgets = <Widget>[];
+    for (final platform in PlatformType.values) {
+      final group = results.where((l) => l.platform == platform).toList();
+      if (group.isEmpty) continue;
+      widgets.add(Padding(
+        padding: const EdgeInsets.only(top: 18, bottom: 10),
+        child: Row(
+          children: [
+            Eyebrow(platform.displayName),
+            const Spacer(),
+            Text('${group.length}',
+                style: theme.textTheme.bodySmall
+                    ?.copyWith(color: NotionTheme.fog2)),
+          ],
+        ),
+      ));
+      for (final link in group) {
+        widgets.add(Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: LinkCard(link: link),
+        ));
+      }
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: widgets,
     );
   }
 
@@ -224,7 +241,7 @@ class _VaultHubScreenState extends ConsumerState<VaultHubScreen> {
     final picks = ref.watch(dailyPicksProvider).valueOrNull ?? const [];
     final fresh = ref.watch(latestContentProvider).valueOrNull ?? const [];
     final bookmarks = ref.watch(latestBookmarksProvider).valueOrNull ?? const [];
-    final phoneShown = phone.take(8).toList();
+    final phoneShown = phone.take(6).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

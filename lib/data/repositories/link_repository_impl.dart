@@ -147,9 +147,13 @@ class LinkRepositoryImpl implements ILinkRepository {
   // ---- Vault Hub / Library queries ----
 
   @override
-  Future<int> countByKind(String kind) async {
+  Future<int> countByKind(String kind, {bool excludeMobile = false}) async {
     final isar = await db;
-    return isar.linkModels.filter().itemKindEqualTo(kind).count();
+    return isar.linkModels
+        .filter()
+        .itemKindEqualTo(kind)
+        .optional(excludeMobile, (q) => q.not().savedViaEqualTo('mobile'))
+        .count();
   }
 
   @override
@@ -176,11 +180,13 @@ class LinkRepositoryImpl implements ILinkRepository {
   }
 
   @override
-  Future<List<Link>> latestByKind(String kind, {int limit = 10}) async {
+  Future<List<Link>> latestByKind(String kind,
+      {int limit = 10, bool excludeMobile = false}) async {
     final isar = await db;
     final links = await isar.linkModels
         .filter()
         .itemKindEqualTo(kind)
+        .optional(excludeMobile, (q) => q.not().savedViaEqualTo('mobile'))
         .sortByCreatedAtDesc()
         .limit(limit)
         .findAll();
@@ -190,9 +196,13 @@ class LinkRepositoryImpl implements ILinkRepository {
   @override
   Future<List<Link>> pinned() async {
     final isar = await db;
+    // Priority Vault = pinned bookmarks, excluding phone/extension saves.
     final links = await isar.linkModels
         .filter()
         .isPinnedEqualTo(true)
+        .itemKindEqualTo('bookmark')
+        .not()
+        .savedViaEqualTo('mobile')
         .sortByCreatedAtDesc()
         .findAll();
     return links.map((e) => e.toEntity()).toList();
@@ -204,6 +214,12 @@ class LinkRepositoryImpl implements ILinkRepository {
     final builder = isar.linkModels
         .filter()
         .itemKindEqualTo(f.kind)
+        // Bookmarks view excludes phone/extension saves — those live in the
+        // Mobile tab only.
+        .optional(
+          f.kind == 'bookmark',
+          (q) => q.not().savedViaEqualTo('mobile'),
+        )
         .optional(
           f.folderId != null,
           (q) => q.folderRemoteIdsElementEqualTo(f.folderId!),
