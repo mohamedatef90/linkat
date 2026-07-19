@@ -1,7 +1,7 @@
-# Linkat
+# Qlip
 
 <p align="center">
-  <img src="assets/linkat.png" alt="Linkat Logo" width="200"/>
+  <img src="assets/qlip.png" alt="Qlip Logo" width="200"/>
 </p>
 
 <p align="center">
@@ -21,7 +21,7 @@
 
 ## Overview
 
-Linkat is the **mobile client for RefVault** — an AI knowledge vault it shares with the [BentoLinks](https://github.com/mohamedatef90/bentolinks-ai) web app over one Supabase backend. Save a link from the iOS share sheet and it syncs to the cloud, where it's fetched, read, and **AI-enriched server-side** (title, summary, key points, topic, tags), then streamed back to your phone. Everything you save on your phone is also there on the web, and vice-versa.
+This is the **Qlip iOS app** — the phone client for Qlip, an AI knowledge vault it shares with the [Qlip web app](https://github.com/mohamedatef90/bentolinks-ai) over one Supabase backend. Save a link from the iOS share sheet and it syncs to the cloud, where it's fetched, read, and **AI-enriched server-side** (title, summary, key points, topic, tags), then streamed back to your phone. Everything you save on your phone is also there on the web, and vice-versa.
 
 > **Note:** AI now runs **server-side** in Supabase Edge Functions (NVIDIA + Gemini), not on-device. The app just saves URLs and displays the enriched results; no AI key lives in the app.
 
@@ -118,7 +118,7 @@ In Xcode:
 ### Saving a Link
 
 **Method 1: In-App**
-1. Open Linkat
+1. Open Qlip
 2. Tap the "+" button
 3. Paste or type the URL
 4. (Optional) Expand "Advanced Options" to add custom title, description, or tags
@@ -128,7 +128,7 @@ In Xcode:
 **Method 2: Share Extension**
 1. In any app (Safari, social media, etc.), find a link you want to save
 2. Tap the Share button
-3. Select "Linkat" from the share sheet
+3. Select "Qlip" from the share sheet
 4. The link will be saved automatically with AI processing
 
 ### Browsing Links
@@ -152,7 +152,7 @@ In Xcode:
 - **Local Database**: Isar (offline cache + sync queue)
 - **Routing**: go_router
 - **Backend**: Supabase (`supabase_flutter`) — Auth, Postgres (RLS), Edge Functions, Realtime
-- **AI/ML**: server-side (NVIDIA `gpt-oss-20b`/`glm-5.2` + Google Gemini) via RefVault Edge Functions — nothing runs on-device
+- **AI/ML**: server-side (NVIDIA `gpt-oss-20b`/`glm-5.2` + Google Gemini) via Qlip Edge Functions — nothing runs on-device
 - **Media**: cached_network_image, url_launcher
 
 ## Architecture
@@ -183,7 +183,7 @@ lib/
 | Component | Description |
 |-----------|-------------|
 | `SyncService` | Two-way cloud sync (server-wins): push queued local ops, pull server changes, back-fill local-only rows |
-| `SupabaseDatasource` | RefVault backend access — `save-item`/`translate`/`discover-feed`/`rss-poller` Edge Functions, content_items, folders, feeds, Realtime |
+| `SupabaseDatasource` | Qlip backend access — `save-item`/`translate`/`discover-feed`/`rss-poller` Edge Functions, content_items, folders, feeds, Realtime |
 | `MetadataService` | Fetches OpenGraph metadata for an instant local preview (server re-parses for the real data) |
 | `PlatformDetectionService` | Identifies social platforms from URLs |
 | `LinkRepository` / `IsarSyncLocalStore` | Local Isar cache + sync queue |
@@ -201,7 +201,7 @@ Key points:
 
 ## Backend
 
-Linkat talks to the shared **RefVault** Supabase project. The Supabase URL + public anon key are in `lib/main.dart`; access is enforced by Row-Level Security and Auth. All AI provider keys (NVIDIA, Gemini, Apify) are stored in Supabase Vault and used only by Edge Functions — **no secrets ship in the app**.
+Qlip talks to the shared Supabase project. The Supabase URL + public anon key are in `lib/main.dart`; access is enforced by Row-Level Security and Auth. All AI provider keys (NVIDIA, Gemini, Apify) are stored in Supabase Vault and used only by Edge Functions — **no secrets ship in the app**.
 
 ## Contributing
 

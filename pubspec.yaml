@@ -1,5 +1,5 @@
 name: linkat
-description: "A new Flutter project."
+description: "Qlip — an AI knowledge vault. Save anything and turn it into readable, searchable knowledge."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -79,7 +79,7 @@ flutter:
 
   # To add assets to your application, add an assets section, like this:
   assets:
-    - assets/linkat.png
+    - assets/qlip.png
   #   - images/a_dot_ham.jpeg
 
   # An image asset can refer to one or more resolution-specific "variants", see
@@ -112,18 +112,18 @@ flutter:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/linkat.png"
+  image_path: "assets/qlip-icon.png"
   remove_alpha_ios: true
-  adaptive_icon_background: "#000000"
-  adaptive_icon_foreground: "assets/linkat.png"
+  adaptive_icon_background: "#0A1320"
+  adaptive_icon_foreground: "assets/qlip-icon.png"
   web:
     generate: true
-    image_path: "assets/linkat.png"
-    background_color: "#000000"
-    theme_color: "#000000"
+    image_path: "assets/qlip-icon.png"
+    background_color: "#0A1320"
+    theme_color: "#A8CF38"
   windows:
     generate: true
-    image_path: "assets/linkat.png"
+    image_path: "assets/qlip-icon.png"
   macos:
     generate: true
-    image_path: "assets/linkat.png"
+    image_path: "assets/qlip-icon.png"

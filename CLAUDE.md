@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Linkat is the Flutter mobile client of **RefVault** (evolved from BentoLinks): an AI knowledge vault backed by Supabase. Links are saved through the `save-item` Edge Function, parsed and AI-enriched **server-side** (Gemini runs in Edge Functions, not on-device), and synced into a local Isar cache so the app works offline. The web client lives in the `bentolinks-ai` repo and shares the same backend and accounts.
+Qlip is the Flutter mobile client of **Qlip** (evolved from Qlip): an AI knowledge vault backed by Supabase. Links are saved through the `save-item` Edge Function, parsed and AI-enriched **server-side** (Gemini runs in Edge Functions, not on-device), and synced into a local Isar cache so the app works offline. The web client lives in the `bentolinks-ai` repo and shares the same backend and accounts.
 
 ## Build Commands
 

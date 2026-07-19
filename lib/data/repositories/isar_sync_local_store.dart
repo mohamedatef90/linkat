@@ -10,7 +10,9 @@ import '../services/sync_service.dart';
 /// SyncLocalStore backed by the app's Isar database, with lastSyncAt kept in
 /// SharedPreferences.
 class IsarSyncLocalStore implements SyncLocalStore {
-  static const _lastSyncKey = 'sync_last_sync_at';
+  // v2: key bumped to force a one-time full re-pull so existing rows get
+  // item_kind / saved_via / published_at backfilled (pull upserts by remoteId).
+  static const _lastSyncKey = 'sync_last_sync_at_v2';
 
   late final Future<Isar> db;
 

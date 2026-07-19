@@ -55,6 +55,13 @@ class LinkModel {
   bool isPinned = false;
   List<String> folderRemoteIds = [];
 
+  /// bookmark | content — partitions every Vault Hub / Library query.
+  @Index()
+  String itemKind = 'bookmark';
+
+  String? savedVia;
+  DateTime? publishedAt;
+
   Link toEntity() {
     return Link(
       id: id,
@@ -82,6 +89,9 @@ class LinkModel {
       isStarred: isStarred,
       isPinned: isPinned,
       folderRemoteIds: folderRemoteIds,
+      itemKind: itemKind,
+      savedVia: savedVia,
+      publishedAt: publishedAt,
     );
   }
 
@@ -111,6 +121,9 @@ class LinkModel {
       ..readStatus = link.readStatus
       ..isStarred = link.isStarred
       ..isPinned = link.isPinned
-      ..folderRemoteIds = link.folderRemoteIds;
+      ..folderRemoteIds = link.folderRemoteIds
+      ..itemKind = link.itemKind
+      ..savedVia = link.savedVia
+      ..publishedAt = link.publishedAt;
   }
 }
