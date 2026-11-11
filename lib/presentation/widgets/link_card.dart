@@ -210,11 +210,14 @@ class LinkCard extends ConsumerWidget {
   Widget _kindBadge() {
     final p = link.platform;
     final color = _platformColor(p);
+    // A content item on a non-social platform would repeat the type here, since
+    // the thumbnail already carries the "Article" / "Video" / "Reel" badge. Keep
+    // that case icon-only so the type is named exactly once on the card.
     final label = p == PlatformType.other
-        ? (_isContent ? link.contentType.displayName : 'Bookmark')
+        ? (_isContent ? null : 'Bookmark')
         : p.displayName;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      padding: EdgeInsets.symmetric(horizontal: label == null ? 5 : 7, vertical: 3),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.14),
         borderRadius: BorderRadius.circular(6),
@@ -223,16 +226,18 @@ class LinkCard extends ConsumerWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           _platformIcon(p, color),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: TextStyle(
-              color: color,
-              fontSize: 9,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.2,
+          if (label != null) ...[
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.2,
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );
