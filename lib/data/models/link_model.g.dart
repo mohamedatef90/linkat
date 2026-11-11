@@ -68,77 +68,92 @@ const LinkModelSchema = CollectionSchema(
       name: r'isStarred',
       type: IsarType.bool,
     ),
-    r'keyPoints': PropertySchema(
+    r'itemKind': PropertySchema(
       id: 10,
+      name: r'itemKind',
+      type: IsarType.string,
+    ),
+    r'keyPoints': PropertySchema(
+      id: 11,
       name: r'keyPoints',
       type: IsarType.stringList,
     ),
     r'pendingOp': PropertySchema(
-      id: 11,
+      id: 12,
       name: r'pendingOp',
       type: IsarType.byte,
       enumMap: _LinkModelpendingOpEnumValueMap,
     ),
     r'platform': PropertySchema(
-      id: 12,
+      id: 13,
       name: r'platform',
       type: IsarType.byte,
       enumMap: _LinkModelplatformEnumValueMap,
     ),
+    r'publishedAt': PropertySchema(
+      id: 14,
+      name: r'publishedAt',
+      type: IsarType.dateTime,
+    ),
     r'publisherName': PropertySchema(
-      id: 13,
+      id: 15,
       name: r'publisherName',
       type: IsarType.string,
     ),
     r'readStatus': PropertySchema(
-      id: 14,
+      id: 16,
       name: r'readStatus',
       type: IsarType.string,
     ),
     r'remoteId': PropertySchema(
-      id: 15,
+      id: 17,
       name: r'remoteId',
       type: IsarType.string,
     ),
+    r'savedVia': PropertySchema(
+      id: 18,
+      name: r'savedVia',
+      type: IsarType.string,
+    ),
     r'status': PropertySchema(
-      id: 16,
+      id: 19,
       name: r'status',
       type: IsarType.byte,
       enumMap: _LinkModelstatusEnumValueMap,
     ),
     r'summary': PropertySchema(
-      id: 17,
+      id: 20,
       name: r'summary',
       type: IsarType.string,
     ),
     r'tags': PropertySchema(
-      id: 18,
+      id: 21,
       name: r'tags',
       type: IsarType.stringList,
     ),
     r'title': PropertySchema(
-      id: 19,
+      id: 22,
       name: r'title',
       type: IsarType.string,
     ),
     r'topic': PropertySchema(
-      id: 20,
+      id: 23,
       name: r'topic',
       type: IsarType.byte,
       enumMap: _LinkModeltopicEnumValueMap,
     ),
     r'topicLabel': PropertySchema(
-      id: 21,
+      id: 24,
       name: r'topicLabel',
       type: IsarType.string,
     ),
     r'updatedAt': PropertySchema(
-      id: 22,
+      id: 25,
       name: r'updatedAt',
       type: IsarType.dateTime,
     ),
     r'url': PropertySchema(
-      id: 23,
+      id: 26,
       name: r'url',
       type: IsarType.string,
     )
@@ -157,6 +172,19 @@ const LinkModelSchema = CollectionSchema(
       properties: [
         IndexPropertySchema(
           name: r'remoteId',
+          type: IndexType.hash,
+          caseSensitive: true,
+        )
+      ],
+    ),
+    r'itemKind': IndexSchema(
+      id: -8418990433367552718,
+      name: r'itemKind',
+      unique: false,
+      replace: false,
+      properties: [
+        IndexPropertySchema(
+          name: r'itemKind',
           type: IndexType.hash,
           caseSensitive: true,
         )
@@ -208,6 +236,7 @@ int _linkModelEstimateSize(
       bytesCount += 3 + value.length * 3;
     }
   }
+  bytesCount += 3 + object.itemKind.length * 3;
   bytesCount += 3 + object.keyPoints.length * 3;
   {
     for (var i = 0; i < object.keyPoints.length; i++) {
@@ -224,6 +253,12 @@ int _linkModelEstimateSize(
   bytesCount += 3 + object.readStatus.length * 3;
   {
     final value = object.remoteId;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
+  {
+    final value = object.savedVia;
     if (value != null) {
       bytesCount += 3 + value.length * 3;
     }
@@ -268,20 +303,23 @@ void _linkModelSerialize(
   writer.writeString(offsets[7], object.imageUrl);
   writer.writeBool(offsets[8], object.isPinned);
   writer.writeBool(offsets[9], object.isStarred);
-  writer.writeStringList(offsets[10], object.keyPoints);
-  writer.writeByte(offsets[11], object.pendingOp.index);
-  writer.writeByte(offsets[12], object.platform.index);
-  writer.writeString(offsets[13], object.publisherName);
-  writer.writeString(offsets[14], object.readStatus);
-  writer.writeString(offsets[15], object.remoteId);
-  writer.writeByte(offsets[16], object.status.index);
-  writer.writeString(offsets[17], object.summary);
-  writer.writeStringList(offsets[18], object.tags);
-  writer.writeString(offsets[19], object.title);
-  writer.writeByte(offsets[20], object.topic.index);
-  writer.writeString(offsets[21], object.topicLabel);
-  writer.writeDateTime(offsets[22], object.updatedAt);
-  writer.writeString(offsets[23], object.url);
+  writer.writeString(offsets[10], object.itemKind);
+  writer.writeStringList(offsets[11], object.keyPoints);
+  writer.writeByte(offsets[12], object.pendingOp.index);
+  writer.writeByte(offsets[13], object.platform.index);
+  writer.writeDateTime(offsets[14], object.publishedAt);
+  writer.writeString(offsets[15], object.publisherName);
+  writer.writeString(offsets[16], object.readStatus);
+  writer.writeString(offsets[17], object.remoteId);
+  writer.writeString(offsets[18], object.savedVia);
+  writer.writeByte(offsets[19], object.status.index);
+  writer.writeString(offsets[20], object.summary);
+  writer.writeStringList(offsets[21], object.tags);
+  writer.writeString(offsets[22], object.title);
+  writer.writeByte(offsets[23], object.topic.index);
+  writer.writeString(offsets[24], object.topicLabel);
+  writer.writeDateTime(offsets[25], object.updatedAt);
+  writer.writeString(offsets[26], object.url);
 }
 
 LinkModel _linkModelDeserialize(
@@ -304,28 +342,31 @@ LinkModel _linkModelDeserialize(
   object.imageUrl = reader.readStringOrNull(offsets[7]);
   object.isPinned = reader.readBool(offsets[8]);
   object.isStarred = reader.readBool(offsets[9]);
-  object.keyPoints = reader.readStringList(offsets[10]) ?? [];
+  object.itemKind = reader.readString(offsets[10]);
+  object.keyPoints = reader.readStringList(offsets[11]) ?? [];
   object.pendingOp =
-      _LinkModelpendingOpValueEnumMap[reader.readByteOrNull(offsets[11])] ??
+      _LinkModelpendingOpValueEnumMap[reader.readByteOrNull(offsets[12])] ??
           PendingOp.none;
   object.platform =
-      _LinkModelplatformValueEnumMap[reader.readByteOrNull(offsets[12])] ??
+      _LinkModelplatformValueEnumMap[reader.readByteOrNull(offsets[13])] ??
           PlatformType.facebook;
-  object.publisherName = reader.readStringOrNull(offsets[13]);
-  object.readStatus = reader.readString(offsets[14]);
-  object.remoteId = reader.readStringOrNull(offsets[15]);
+  object.publishedAt = reader.readDateTimeOrNull(offsets[14]);
+  object.publisherName = reader.readStringOrNull(offsets[15]);
+  object.readStatus = reader.readString(offsets[16]);
+  object.remoteId = reader.readStringOrNull(offsets[17]);
+  object.savedVia = reader.readStringOrNull(offsets[18]);
   object.status =
-      _LinkModelstatusValueEnumMap[reader.readByteOrNull(offsets[16])] ??
+      _LinkModelstatusValueEnumMap[reader.readByteOrNull(offsets[19])] ??
           ItemStatus.pending;
-  object.summary = reader.readStringOrNull(offsets[17]);
-  object.tags = reader.readStringList(offsets[18]) ?? [];
-  object.title = reader.readString(offsets[19]);
+  object.summary = reader.readStringOrNull(offsets[20]);
+  object.tags = reader.readStringList(offsets[21]) ?? [];
+  object.title = reader.readString(offsets[22]);
   object.topic =
-      _LinkModeltopicValueEnumMap[reader.readByteOrNull(offsets[20])] ??
+      _LinkModeltopicValueEnumMap[reader.readByteOrNull(offsets[23])] ??
           TopicType.aiTech;
-  object.topicLabel = reader.readStringOrNull(offsets[21]);
-  object.updatedAt = reader.readDateTimeOrNull(offsets[22]);
-  object.url = reader.readString(offsets[23]);
+  object.topicLabel = reader.readStringOrNull(offsets[24]);
+  object.updatedAt = reader.readDateTimeOrNull(offsets[25]);
+  object.url = reader.readString(offsets[26]);
   return object;
 }
 
@@ -359,36 +400,42 @@ P _linkModelDeserializeProp<P>(
     case 9:
       return (reader.readBool(offset)) as P;
     case 10:
-      return (reader.readStringList(offset) ?? []) as P;
+      return (reader.readString(offset)) as P;
     case 11:
+      return (reader.readStringList(offset) ?? []) as P;
+    case 12:
       return (_LinkModelpendingOpValueEnumMap[reader.readByteOrNull(offset)] ??
           PendingOp.none) as P;
-    case 12:
+    case 13:
       return (_LinkModelplatformValueEnumMap[reader.readByteOrNull(offset)] ??
           PlatformType.facebook) as P;
-    case 13:
-      return (reader.readStringOrNull(offset)) as P;
     case 14:
-      return (reader.readString(offset)) as P;
+      return (reader.readDateTimeOrNull(offset)) as P;
     case 15:
       return (reader.readStringOrNull(offset)) as P;
     case 16:
-      return (_LinkModelstatusValueEnumMap[reader.readByteOrNull(offset)] ??
-          ItemStatus.pending) as P;
+      return (reader.readString(offset)) as P;
     case 17:
       return (reader.readStringOrNull(offset)) as P;
     case 18:
-      return (reader.readStringList(offset) ?? []) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 19:
-      return (reader.readString(offset)) as P;
+      return (_LinkModelstatusValueEnumMap[reader.readByteOrNull(offset)] ??
+          ItemStatus.pending) as P;
     case 20:
+      return (reader.readStringOrNull(offset)) as P;
+    case 21:
+      return (reader.readStringList(offset) ?? []) as P;
+    case 22:
+      return (reader.readString(offset)) as P;
+    case 23:
       return (_LinkModeltopicValueEnumMap[reader.readByteOrNull(offset)] ??
           TopicType.aiTech) as P;
-    case 21:
+    case 24:
       return (reader.readStringOrNull(offset)) as P;
-    case 22:
+    case 25:
       return (reader.readDateTimeOrNull(offset)) as P;
-    case 23:
+    case 26:
       return (reader.readString(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -635,6 +682,51 @@ extension LinkModelQueryWhere
               indexName: r'remoteId',
               lower: [],
               upper: [remoteId],
+              includeUpper: false,
+            ));
+      }
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterWhereClause> itemKindEqualTo(
+      String itemKind) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.equalTo(
+        indexName: r'itemKind',
+        value: [itemKind],
+      ));
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterWhereClause> itemKindNotEqualTo(
+      String itemKind) {
+    return QueryBuilder.apply(this, (query) {
+      if (query.whereSort == Sort.asc) {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'itemKind',
+              lower: [],
+              upper: [itemKind],
+              includeUpper: false,
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'itemKind',
+              lower: [itemKind],
+              includeLower: false,
+              upper: [],
+            ));
+      } else {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'itemKind',
+              lower: [itemKind],
+              includeLower: false,
+              upper: [],
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'itemKind',
+              lower: [],
+              upper: [itemKind],
               includeUpper: false,
             ));
       }
@@ -1731,6 +1823,137 @@ extension LinkModelQueryFilter
     });
   }
 
+  QueryBuilder<LinkModel, LinkModel, QAfterFilterCondition> itemKindEqualTo(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'itemKind',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterFilterCondition> itemKindGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'itemKind',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterFilterCondition> itemKindLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'itemKind',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterFilterCondition> itemKindBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'itemKind',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterFilterCondition> itemKindStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'itemKind',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterFilterCondition> itemKindEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'itemKind',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterFilterCondition> itemKindContains(
+      String value,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'itemKind',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterFilterCondition> itemKindMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'itemKind',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterFilterCondition> itemKindIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'itemKind',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterFilterCondition>
+      itemKindIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'itemKind',
+        value: '',
+      ));
+    });
+  }
+
   QueryBuilder<LinkModel, LinkModel, QAfterFilterCondition>
       keyPointsElementEqualTo(
     String value, {
@@ -2054,6 +2277,78 @@ extension LinkModelQueryFilter
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.between(
         property: r'platform',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterFilterCondition>
+      publishedAtIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'publishedAt',
+      ));
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterFilterCondition>
+      publishedAtIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'publishedAt',
+      ));
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterFilterCondition> publishedAtEqualTo(
+      DateTime? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'publishedAt',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterFilterCondition>
+      publishedAtGreaterThan(
+    DateTime? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'publishedAt',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterFilterCondition> publishedAtLessThan(
+    DateTime? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'publishedAt',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterFilterCondition> publishedAtBetween(
+    DateTime? lower,
+    DateTime? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'publishedAt',
         lower: lower,
         includeLower: includeLower,
         upper: upper,
@@ -2493,6 +2788,154 @@ extension LinkModelQueryFilter
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.greaterThan(
         property: r'remoteId',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterFilterCondition> savedViaIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'savedVia',
+      ));
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterFilterCondition>
+      savedViaIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'savedVia',
+      ));
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterFilterCondition> savedViaEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'savedVia',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterFilterCondition> savedViaGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'savedVia',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterFilterCondition> savedViaLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'savedVia',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterFilterCondition> savedViaBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'savedVia',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterFilterCondition> savedViaStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'savedVia',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterFilterCondition> savedViaEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'savedVia',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterFilterCondition> savedViaContains(
+      String value,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'savedVia',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterFilterCondition> savedViaMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'savedVia',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterFilterCondition> savedViaIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'savedVia',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterFilterCondition>
+      savedViaIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'savedVia',
         value: '',
       ));
     });
@@ -3569,6 +4012,18 @@ extension LinkModelQuerySortBy on QueryBuilder<LinkModel, LinkModel, QSortBy> {
     });
   }
 
+  QueryBuilder<LinkModel, LinkModel, QAfterSortBy> sortByItemKind() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'itemKind', Sort.asc);
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterSortBy> sortByItemKindDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'itemKind', Sort.desc);
+    });
+  }
+
   QueryBuilder<LinkModel, LinkModel, QAfterSortBy> sortByPendingOp() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'pendingOp', Sort.asc);
@@ -3590,6 +4045,18 @@ extension LinkModelQuerySortBy on QueryBuilder<LinkModel, LinkModel, QSortBy> {
   QueryBuilder<LinkModel, LinkModel, QAfterSortBy> sortByPlatformDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'platform', Sort.desc);
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterSortBy> sortByPublishedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'publishedAt', Sort.asc);
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterSortBy> sortByPublishedAtDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'publishedAt', Sort.desc);
     });
   }
 
@@ -3626,6 +4093,18 @@ extension LinkModelQuerySortBy on QueryBuilder<LinkModel, LinkModel, QSortBy> {
   QueryBuilder<LinkModel, LinkModel, QAfterSortBy> sortByRemoteIdDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'remoteId', Sort.desc);
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterSortBy> sortBySavedVia() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'savedVia', Sort.asc);
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterSortBy> sortBySavedViaDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'savedVia', Sort.desc);
     });
   }
 
@@ -3837,6 +4316,18 @@ extension LinkModelQuerySortThenBy
     });
   }
 
+  QueryBuilder<LinkModel, LinkModel, QAfterSortBy> thenByItemKind() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'itemKind', Sort.asc);
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterSortBy> thenByItemKindDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'itemKind', Sort.desc);
+    });
+  }
+
   QueryBuilder<LinkModel, LinkModel, QAfterSortBy> thenByPendingOp() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'pendingOp', Sort.asc);
@@ -3858,6 +4349,18 @@ extension LinkModelQuerySortThenBy
   QueryBuilder<LinkModel, LinkModel, QAfterSortBy> thenByPlatformDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'platform', Sort.desc);
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterSortBy> thenByPublishedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'publishedAt', Sort.asc);
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterSortBy> thenByPublishedAtDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'publishedAt', Sort.desc);
     });
   }
 
@@ -3894,6 +4397,18 @@ extension LinkModelQuerySortThenBy
   QueryBuilder<LinkModel, LinkModel, QAfterSortBy> thenByRemoteIdDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'remoteId', Sort.desc);
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterSortBy> thenBySavedVia() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'savedVia', Sort.asc);
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QAfterSortBy> thenBySavedViaDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'savedVia', Sort.desc);
     });
   }
 
@@ -4049,6 +4564,13 @@ extension LinkModelQueryWhereDistinct
     });
   }
 
+  QueryBuilder<LinkModel, LinkModel, QDistinct> distinctByItemKind(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'itemKind', caseSensitive: caseSensitive);
+    });
+  }
+
   QueryBuilder<LinkModel, LinkModel, QDistinct> distinctByKeyPoints() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'keyPoints');
@@ -4064,6 +4586,12 @@ extension LinkModelQueryWhereDistinct
   QueryBuilder<LinkModel, LinkModel, QDistinct> distinctByPlatform() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'platform');
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QDistinct> distinctByPublishedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'publishedAt');
     });
   }
 
@@ -4086,6 +4614,13 @@ extension LinkModelQueryWhereDistinct
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'remoteId', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<LinkModel, LinkModel, QDistinct> distinctBySavedVia(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'savedVia', caseSensitive: caseSensitive);
     });
   }
 
@@ -4211,6 +4746,12 @@ extension LinkModelQueryProperty
     });
   }
 
+  QueryBuilder<LinkModel, String, QQueryOperations> itemKindProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'itemKind');
+    });
+  }
+
   QueryBuilder<LinkModel, List<String>, QQueryOperations> keyPointsProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'keyPoints');
@@ -4229,6 +4770,12 @@ extension LinkModelQueryProperty
     });
   }
 
+  QueryBuilder<LinkModel, DateTime?, QQueryOperations> publishedAtProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'publishedAt');
+    });
+  }
+
   QueryBuilder<LinkModel, String?, QQueryOperations> publisherNameProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'publisherName');
@@ -4244,6 +4791,12 @@ extension LinkModelQueryProperty
   QueryBuilder<LinkModel, String?, QQueryOperations> remoteIdProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'remoteId');
+    });
+  }
+
+  QueryBuilder<LinkModel, String?, QQueryOperations> savedViaProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'savedVia');
     });
   }
 

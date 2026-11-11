@@ -12,6 +12,7 @@ import '../../data/services/sync_service.dart';
 import '../../domain/entities/link.dart';
 import '../../domain/entities/sync_types.dart';
 import 'auth_providers.dart';
+import 'library_providers.dart';
 import 'link_providers.dart';
 
 final supabaseDatasourceProvider = Provider<SupabaseDatasource>((ref) {
@@ -114,6 +115,21 @@ class SyncController {
     refreshLinkProviders();
   }
 
+  /// Re-run the AI pipeline for an item (web's "Retry AI"). Flips the local
+  /// card to pending immediately; Realtime streams the pending → ready
+  /// transition back via [subscribeToItems]. Not queued — retry has no
+  /// offline meaning. Rethrows so the caller can surface a failure.
+  Future<void> retryAi(Link link) async {
+    if (link.remoteId == null) return;
+    if (link.id != null) {
+      await _ref.read(syncLocalStoreProvider).put(
+            link.copyWith(status: ItemStatus.pending, pendingOp: PendingOp.none),
+          );
+      refreshLinkProviders();
+    }
+    await _ref.read(supabaseDatasourceProvider).retryItem(link.remoteId!);
+  }
+
   Future<Link> _buildPreview(String url, {String? fallbackTitle}) async {
     final platform =
         _ref.read(platformDetectionServiceProvider).detectPlatform(url);
@@ -151,6 +167,9 @@ class SyncController {
       contentType: contentType,
       createdAt: DateTime.now(),
       status: ItemStatus.pending,
+      // Saved from this phone — mark it so it shows in the Mobile tab / "From
+      // your phone" immediately, before the server round-trip confirms it.
+      savedVia: 'mobile',
     );
   }
 
@@ -161,6 +180,14 @@ class SyncController {
     _ref.invalidate(linksByTagProvider);
     _ref.invalidate(linksByTopicProvider);
     _ref.invalidate(searchLinksProvider);
+    // Vault Hub + Library surfaces
+    _ref.invalidate(vaultCountsProvider);
+    _ref.invalidate(continueReadingProvider);
+    _ref.invalidate(latestContentProvider);
+    _ref.invalidate(latestBookmarksProvider);
+    _ref.invalidate(pinnedLinksProvider);
+    _ref.invalidate(mobileLinksProvider);
+    _ref.invalidate(libraryProvider);
   }
 
   void dispose() {
@@ -192,6 +219,13 @@ final feedsProvider = FutureProvider<List<RemoteFeed>>((ref) {
 final freshFeedItemsProvider = FutureProvider<List<Link>>((ref) {
   ref.watch(authStateChangesProvider);
   return ref.watch(supabaseDatasourceProvider).fetchFreshFeedItems();
+});
+
+/// Today's Picks — the nightly resurface set (≤5 items). Remote-fetched, no
+/// local cache; the underlying items already live in Isar via sync.
+final dailyPicksProvider = FutureProvider<List<Link>>((ref) {
+  ref.watch(authStateChangesProvider);
+  return ref.watch(supabaseDatasourceProvider).fetchDailyPicks();
 });
 
 /// content_text is large; fetched only when the reader opens.

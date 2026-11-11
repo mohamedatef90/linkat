@@ -6,7 +6,7 @@ import '../providers/auth_providers.dart';
 import '../theme/notion_theme.dart';
 import '../widgets/magic/magic.dart';
 
-/// Email + password sign in / sign up against the shared RefVault backend
+/// Email + password sign in / sign up against the shared Qlip backend
 /// (same account as the web app).
 class AuthScreen extends ConsumerStatefulWidget {
   const AuthScreen({super.key});
@@ -93,7 +93,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(22),
                         child: Image.asset(
-                          'assets/linkat.png',
+                          'assets/qlip.png',
                           width: 84,
                           height: 84,
                         ),

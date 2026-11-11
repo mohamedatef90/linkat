@@ -100,7 +100,7 @@ class TranslationResult {
   });
 }
 
-/// Remote data access for the RefVault Supabase backend
+/// Remote data access for the Qlip Supabase backend
 /// (content_items / folders tables + save-item Edge Function).
 class SupabaseDatasource implements SyncRemoteStore {
   final SupabaseClient _client;
@@ -110,26 +110,52 @@ class SupabaseDatasource implements SyncRemoteStore {
 
   // ---- content_items ----
 
+  /// PostgREST caps responses at 1000 rows, so both full-table reads below
+  /// page with .range() until a short page signals the end.
+  static const _pageSize = 1000;
+
   @override
   Future<List<Link>> fetchItemsSince(DateTime? since) async {
-    var query = _client
-        .from('content_items')
-        .select('*, item_folders(folder_id)');
-    if (since != null) {
-      query = query.gte('updated_at', since.toUtc().toIso8601String());
+    final all = <Link>[];
+    var offset = 0;
+    while (true) {
+      var query = _client
+          .from('content_items')
+          .select('*, item_folders(folder_id)');
+      if (since != null) {
+        query = query.gte('updated_at', since.toUtc().toIso8601String());
+      }
+      final rows = await query
+          .order('updated_at', ascending: true)
+          .range(offset, offset + _pageSize - 1);
+      final page = (rows as List)
+          .map((row) => linkFromRow(row as Map<String, dynamic>))
+          .toList();
+      all.addAll(page);
+      if (page.length < _pageSize) break;
+      offset += _pageSize;
     }
-    final rows = await query.order('updated_at', ascending: true);
-    return (rows as List)
-        .map((row) => linkFromRow(row as Map<String, dynamic>))
-        .toList();
+    return all;
   }
 
   @override
   Future<Set<String>> fetchAllItemIds() async {
-    final rows = await _client.from('content_items').select('id');
-    return (rows as List)
-        .map((row) => (row as Map<String, dynamic>)['id'] as String)
-        .toSet();
+    final ids = <String>{};
+    var offset = 0;
+    while (true) {
+      final rows = await _client
+          .from('content_items')
+          .select('id')
+          .order('id', ascending: true)
+          .range(offset, offset + _pageSize - 1);
+      final page = (rows as List)
+          .map((row) => (row as Map<String, dynamic>)['id'] as String)
+          .toList();
+      ids.addAll(page);
+      if (page.length < _pageSize) break;
+      offset += _pageSize;
+    }
+    return ids;
   }
 
   @override
@@ -159,6 +185,26 @@ class SupabaseDatasource implements SyncRemoteStore {
   @override
   Future<void> deleteItem(String remoteId) async {
     await _client.from('content_items').delete().eq('id', remoteId);
+  }
+
+  /// Re-run the parse → enrich pipeline for an item (web's "Retry AI").
+  /// save-item resets status to pending and enqueues a parse job; Realtime
+  /// streams the pending → ready transition back.
+  Future<void> retryItem(String remoteId) async {
+    await _client.functions.invoke(
+      'save-item',
+      body: {'retry_item_id': remoteId},
+    );
+  }
+
+  /// Today's Picks — the nightly resurface set (≤5 read items per user).
+  Future<List<Link>> fetchDailyPicks() async {
+    final rows = await _client
+        .from('content_items')
+        .select('*, item_folders(folder_id), daily_picks!inner(item_id)');
+    return (rows as List)
+        .map((r) => linkFromRow(r as Map<String, dynamic>))
+        .toList();
   }
 
   /// Full text is large, so it is fetched only when the reader opens.
@@ -346,6 +392,10 @@ class SupabaseDatasource implements SyncRemoteStore {
       isStarred: row['is_starred'] as bool? ?? false,
       isPinned: row['is_pinned'] as bool? ?? false,
       folderRemoteIds: folderIds,
+      itemKind: row['item_kind'] as String? ?? 'bookmark',
+      savedVia: row['saved_via'] as String?,
+      publishedAt:
+          DateTime.tryParse(row['published_at'] as String? ?? '')?.toLocal(),
     );
   }
 

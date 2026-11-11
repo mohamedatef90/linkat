@@ -8,7 +8,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../domain/entities/link.dart';
 import '../../domain/entities/platform_type.dart';
-import '../providers/link_providers.dart';
+import '../../domain/entities/sync_types.dart';
 import '../providers/sync_providers.dart';
 import '../theme/notion_theme.dart';
 import '../widgets/status_chip.dart';
@@ -88,36 +88,28 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
     if (mounted) Navigator.of(context).pop();
   }
 
-  /// Local-only refresh of the preview metadata (server owns the real data).
-  Future<void> _refreshMetadata() async {
+  /// Re-run the server AI pipeline (parse → enrich). Repopulates the real
+  /// thumbnail/summary/tags server-side; Realtime streams the result back.
+  Future<void> _retryAi() async {
     if (_isRefreshingMetadata) return;
     setState(() => _isRefreshingMetadata = true);
-
     try {
-      final metadataService = ref.read(metadataServiceProvider);
-      final repository = ref.read(linkRepositoryProvider);
-      final metadata = await metadataService.fetchMetadata(_currentLink.url);
-
+      await ref.read(syncControllerProvider).retryAi(_currentLink);
       if (mounted) {
-        final updatedLink = _currentLink.copyWith(
-          description: metadata['description'] ?? _currentLink.description,
-          imageUrl: metadata['image'] ?? _currentLink.imageUrl,
-          publisherName: metadata['publisher'] ?? _currentLink.publisherName,
+        setState(() =>
+            _currentLink = _currentLink.copyWith(status: ItemStatus.pending));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Re-running AI… the card will update shortly.'),
+            behavior: SnackBarBehavior.floating,
+          ),
         );
-        await repository.updateLink(updatedLink);
-
-        if (metadata['image'] != null) {
-          await CachedNetworkImage.evictFromCache(metadata['image']!);
-        }
-
-        setState(() => _currentLink = updatedLink);
-        ref.read(syncControllerProvider).refreshLinkProviders();
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to refresh: $e'),
+            content: Text('Retry failed: $e'),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -234,7 +226,7 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
           PopupMenuButton<String>(
             iconColor: textColor,
             onSelected: (action) {
-              if (action == 'refresh') _refreshMetadata();
+              if (action == 'refresh') _retryAi();
               if (action == 'delete') _deleteLink();
               if (action == 'read') {
                 _applyUpdate(
@@ -248,7 +240,7 @@ class _LinkDetailScreenState extends ConsumerState<LinkDetailScreen> {
               ),
               const PopupMenuItem(
                 value: 'refresh',
-                child: Text('Refresh preview'),
+                child: Text('Retry AI'),
               ),
               const PopupMenuItem(value: 'delete', child: Text('Delete')),
             ],

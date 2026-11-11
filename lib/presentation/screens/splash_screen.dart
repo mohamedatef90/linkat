@@ -81,7 +81,7 @@ class _SplashScreenState extends State<SplashScreen>
     await Future.delayed(const Duration(milliseconds: 300));
     _glowController.forward();
 
-    // d. "Linkat" text fades in below logo (1200-1800ms)
+    // d. "Qlip" text fades in below logo (1200-1800ms)
     await Future.delayed(const Duration(milliseconds: 200));
     _textController.forward();
 
@@ -147,7 +147,7 @@ class _SplashScreenState extends State<SplashScreen>
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(30),
                         child: Image.asset(
-                          'assets/linkat.png',
+                          'assets/qlip.png',
                           width: 160,
                           height: 160,
                           fit: BoxFit.cover,
@@ -161,7 +161,7 @@ class _SplashScreenState extends State<SplashScreen>
 
             const SizedBox(height: 40),
 
-            // "Linkat" text with gradient and fade animation
+            // "Qlip" text with gradient and fade animation
             FadeTransition(
               opacity: _textFadeAnimation,
               child: ShaderMask(
@@ -175,7 +175,7 @@ class _SplashScreenState extends State<SplashScreen>
                   end: Alignment.bottomRight,
                 ).createShader(bounds),
                 child: const Text(
-                  'RefVault',
+                  'Qlip',
                   style: TextStyle(
                     fontSize: 46,
                     fontWeight: FontWeight.bold,

@@ -2,6 +2,7 @@ import '../entities/link.dart';
 import '../entities/platform_type.dart';
 import '../entities/topic_type.dart';
 import '../entities/custom_category.dart';
+import '../entities/library_filter.dart';
 
 abstract class ILinkRepository {
   Future<List<Link>> getLinks({PlatformType? platform});
@@ -14,6 +15,19 @@ abstract class ILinkRepository {
   Future<List<String>> getAllTags();
   Future<List<Link>> getAllLinks();
   Future<Link?> findByUrl(String url);
+
+  // Vault Hub / Library queries (local-first over synced rows)
+  Future<int> countByKind(String kind, {bool excludeMobile = false});
+  Future<int> countUnread();
+  Future<List<Link>> continueReading({int limit = 10});
+  Future<List<Link>> latestByKind(String kind,
+      {int limit = 10, bool excludeMobile = false});
+  Future<List<Link>> pinned();
+  Future<List<Link>> queryLibrary(LibraryFilter filter);
+
+  /// Links saved from this phone (share extension or manual add),
+  /// `saved_via == 'mobile'`, newest first.
+  Future<List<Link>> savedViaMobile({int? limit});
 
   // Custom Category methods
   Future<List<CustomCategory>> getCustomCategories();
